@@ -1,5 +1,5 @@
-# Created by https://www.toptal.com/developers/gitignore/api/macos,c++,python,jupyternotebooks,visualstudiocode
-# Edit at https://www.toptal.com/developers/gitignore?templates=macos,c++,python,jupyternotebooks,visualstudiocode
+# Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,c++,cmake,python,jupyternotebooks,powershell
+# Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,macos,c++,cmake,python,jupyternotebooks,powershell
 
 ### C++ ###
 # Prerequisites
@@ -34,6 +34,25 @@
 *.exe
 *.out
 *.app
+
+### CMake ###
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+### CMake Patch ###
+CMakeUserPresets.json
+
+# External projects
+*-prefix/
 
 ### JupyterNotebooks ###
 # gitignore template for Jupyter Notebooks
@@ -81,6 +100,12 @@ Temporary Items
 ### macOS Patch ###
 # iCloud generated files
 *.icloud
+
+### PowerShell ###
+# Exclude packaged modules
+*.zip
+
+# Exclude .NET assemblies from source
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -269,4 +294,4 @@ pyrightconfig.json
 .history
 .ionide
 
-# End of https://www.toptal.com/developers/gitignore/api/macos,c++,python,jupyternotebooks,visualstudiocode
+# End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,macos,c++,cmake,python,jupyternotebooks,powershell
