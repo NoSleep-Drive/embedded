@@ -1,4 +1,4 @@
-#include "Camera.h"
+#include "../include/Camera.h"
 
 Camera::Camera() : Device() {
 	resolution = {1920, 1080};

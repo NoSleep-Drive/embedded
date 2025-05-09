@@ -1,4 +1,4 @@
-#include "Device.h"
+#include "../include/Device.h"
 
 Device::Device() : isConnected(false), isDeviceChanged(false) {
 	// Initialize device status for all three devices (camera, accelerometer, speaker)

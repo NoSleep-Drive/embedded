@@ -1,17 +1,12 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include <curl/curl.h>
-
 #include <atomic>
 #include <iostream>
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <string>
 #include <thread>
 #include <vector>
-
-using json = nlohmann::json;
 
 class Device {
 protected:
@@ -24,7 +19,6 @@ public:
 	virtual ~Device();
 
 	virtual void initialize() = 0;
-	virtual void* getData() = 0;
 	void sendDeviceStatus();
 
 	bool getConnectionStatus() const;
