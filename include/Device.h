@@ -1,11 +1,9 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include <atomic>
 #include <iostream>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 class Device {

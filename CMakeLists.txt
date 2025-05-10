@@ -29,4 +29,3 @@ add_executable(nosleep_drive ${SOURCE_FILES})
 # 실행 파일과 외부 라이브러리를 연결
 # OpenCV와 Python 관련 라이브러리를 함께 링크함
 target_link_libraries(nosleep_drive ${OpenCV_LIBS} ${PYTHON_LIBRARIES})
-# target_link_libraries(nosleep_drive ${OpenCV_LIBS})

@@ -7,7 +7,7 @@ Camera::Camera() : Device() {
 Camera::~Camera() {}
 
 void Camera::initialize() {
-	cv::VideoCapture cap(0);	// 0 is the default camera
+	cap.open(0);
 
 	if (!cap.isOpened()) {
 		std::cerr << "Error: Could not open camera." << std::endl;
@@ -37,9 +37,7 @@ void Camera::initialize() {
 }
 
 cv::Mat Camera::captureFrame() {
-	cv::VideoCapture cap(0);
-
-	if (!cap.isOpened()) {
+	if (!cap.isOpened() && !cap.open(0)) {
 		std::cerr << "Error: Could not open camera." << std::endl;
 		setCameraStatus(false);
 		return cv::Mat();

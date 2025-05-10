@@ -45,18 +45,17 @@ void runContinuousMockSensorTest() {
 	MockAccelerationSensor sensor;
 
 	// Alternate between moving and stationary every 5 seconds
-	bool shouldBeMobving = false;
-	int secondsInState = 0;
+	bool shouldBeMoving = false;
+	float secondsInState = 0.0f;
 	int count = 0;
 
 	while (true) {
 		if (secondsInState >= 5) {
-			shouldBeMobving = !shouldBeMobving;
+			shouldBeMoving = !shouldBeMoving;
 			secondsInState = 0;
-			sensor.setMoving(shouldBeMobving);
+			sensor.setMoving(shouldBeMoving);
 			std::cout << std::endl
-								<< "Changing state to: " << (shouldBeMobving ? "MOVING" : "STATIONARY")
-								<< std::endl;
+								<< "Changing state to: " << (shouldBeMoving ? "MOVING" : "STATIONARY") << std::endl;
 		}
 
 		std::vector<float> accel = sensor.getAcceleration();

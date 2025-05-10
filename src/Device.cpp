@@ -1,7 +1,7 @@
 #include "../include/Device.h"
 
 Device::Device() : isConnected(false), isDeviceChanged(false) {
-	// Initialize device status for all three devices (camera, accelerometer, speaker)
+	// 장치 상태 벡터: [0] = 카메라, [1] = 가속도 센서, [2] = 스피커
 	deviceStatus = {false, false, false};
 }
 

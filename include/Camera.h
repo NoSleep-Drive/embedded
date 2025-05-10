@@ -9,6 +9,7 @@ class Camera : public Device {
 private:
 	cv::Mat frameBuffer;
 	std::vector<int> resolution;
+	cv::VideoCapture cap;
 
 public:
 	Camera();
