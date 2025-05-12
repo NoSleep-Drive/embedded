@@ -44,49 +44,19 @@ RealAccelerationSensor::~RealAccelerationSensor() {
 }
 
 bool RealAccelerationSensor::initPython() {
-	// Initialize Python interpreter
 	Py_Initialize();
 
-	// Import required modules
+	// Python 모듈 검색 경로에 현재 디렉터리 추가
 	PyRun_SimpleString("import sys; sys.path.append('.')");
 
-	// Create a Python file with the ADXL345 setup code
-	PyRun_SimpleString(R"(
-import time
-import board
-import busio
-import adafruit_adxl34x
-
-# Create a Python helper module for C++ to call
-with open('adxl345_helper.py', 'w') as f:
-    f.write("""
-import time
-import board
-import busio
-import adafruit_adxl34x
-
-class ADXL345Sensor:
-    def __init__(self):
-        self.i2c = busio.I2C(board.SCL, board.SDA)
-        self.accelerometer = adafruit_adxl34x.ADXL345(self.i2c)
-        self.accelerometer.enable_motion_detection(threshold=18)
-        
-    def get_acceleration(self):
-        return self.accelerometer.acceleration
-        
-    def is_moving(self):
-        return self.accelerometer.events['motion']
-""")
-    )");
-
-	// Import the helper module
+	// 미리 작성한 파이썬 파일 import
 	pModule = PyImport_ImportModule("adxl345_helper");
 	if (pModule == nullptr) {
 		std::cerr << getPythonError() << std::endl;
 		return false;
 	}
+	std::cout << "Python module loaded successfully" << std::endl;
 
-	// Get the ADXL345Sensor class
 	pSensorClass = PyObject_GetAttrString(pModule, "ADXL345Sensor");
 	if (pSensorClass == nullptr) {
 		std::cerr << getPythonError() << std::endl;
@@ -94,8 +64,8 @@ class ADXL345Sensor:
 		pModule = nullptr;
 		return false;
 	}
+	std::cout << "Python class loaded successfully" << std::endl;
 
-	// Create an instance of the sensor class
 	pSensorInstance = PyObject_CallObject(pSensorClass, nullptr);
 	if (pSensorInstance == nullptr) {
 		std::cerr << getPythonError() << std::endl;
@@ -105,6 +75,7 @@ class ADXL345Sensor:
 		pModule = nullptr;
 		return false;
 	}
+	std::cout << "Python instance created successfully" << std::endl;
 
 	return true;
 }
