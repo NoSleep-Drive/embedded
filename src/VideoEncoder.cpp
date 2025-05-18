@@ -4,11 +4,12 @@
 #include <vector>
 #include <filesystem>
 #include <chrono>
+#include <iomanip>
 #include <sstream>
 #include <fstream>
 
 std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
-    // example path(folderPath): ./frames/20230518_120000
+    // example path(folderPath): ./frames/20250519_023859
     std::cout << "파일 경로 " << path << " 생성 시간 기준 전후 각각 2.5초 이미지 프레임들을 영상으로 변환" << std::endl;
     std::vector<cv::String> framePaths;
     std::vector<uchar> videoBuffer;
@@ -56,7 +57,8 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     }
 
     cv::Size frameSize(resolution[1], resolution[0]);
-    std::string tempVideoPath = "temp.mp4";
+    auto tmp = std::filesystem::temp_directory_path() / ("video_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
+    std::string tempVideoPath = tmp.string();
     cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate, frameSize);
 
     for (const auto& frame : framePaths) {
