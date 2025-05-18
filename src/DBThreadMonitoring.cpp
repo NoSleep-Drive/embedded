@@ -1,20 +1,54 @@
 #include "../include/DBThreadMonitoring.h"
+#include "../include/DBThread.h"
+#include <iostream>
+
+DBThreadMonitoring::DBThreadMonitoring() {
+    startDBMonitoring();
+}
 
 void DBThreadMonitoring::startDBMonitoring() {
-    isDBThreadRunning = false;
+    std::thread([this] {
+        processThreadQueue();
+        }).detach();
+}
+
+void DBThreadMonitoring::processThreadQueue() {
+    std::unique_lock<std::mutex> lock(queueMutex);
 
     while (true) {
-        if (!isDBThreadRunning && !threadQueue.empty()) {
-            isDBThreadRunning = true;
-            std::thread t = std::move(threadQueue.front());
+        condition.wait(lock, [this] {
+            return !threadQueue.empty();
+            });
+
+        while (!threadQueue.empty()) {
+            DBThread* thread = threadQueue.front();
             threadQueue.pop();
-            t.detach();
+
+            activeThreads.insert(thread);
+            lock.unlock();
+
+            std::thread([thread, this] {
+                thread->sendDataToDB();
+                std::unique_lock<std::mutex> lock(queueMutex);
+                activeThreads.erase(thread);
+                condition.notify_all();
+                }).detach();
+
+                lock.lock();
         }
     }
 }
 
-void DBThreadMonitoring::startDBThread(DBThread* thread) {
-    threadQueue.push(std::thread(&DBThread::sendDataToDB, thread));
+void DBThreadMonitoring::addDBThread(DBThread* thread) {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    if (activeThreads.find(thread) == activeThreads.end()) {
+        threadQueue.push(thread);
+        condition.notify_one();
+        std::cout << "DBThread 추가됨, 큐 크기: " << threadQueue.size() << std::endl;
+    }
+    else {
+        std::cout << "이미 실행 중인 스레드입니다." << std::endl;
+    }
 }
 
 bool DBThreadMonitoring::getIsDBThreadRunning() const {
@@ -22,5 +56,7 @@ bool DBThreadMonitoring::getIsDBThreadRunning() const {
 }
 
 void DBThreadMonitoring::setIsDBThreadRunning(bool value) {
+    std::unique_lock<std::mutex> lock(queueMutex);
     isDBThreadRunning = value;
+    condition.notify_all();
 }

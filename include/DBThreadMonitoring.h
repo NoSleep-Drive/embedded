@@ -3,23 +3,29 @@
 
 #include <queue>
 #include <thread>
-#include "DBThread.h"
+#include <mutex>
+#include <unordered_set>
+#include <condition_variable>
+
+class DBThread;
 
 class DBThreadMonitoring {
 private:
     bool isDBThreadRunning = false;
-    std::queue<std::thread> threadQueue;
+    std::queue<DBThread*> threadQueue;
+    std::unordered_set<DBThread*> activeThreads;
+    std::mutex queueMutex;
+    std::condition_variable condition;
+
+    void processThreadQueue();
 
 public:
-    DBThreadMonitoring() : isDBThreadRunning(false) {}
-
+    DBThreadMonitoring();
     void startDBMonitoring();
-    void startDBThread(DBThread* thread);
+    void addDBThread(DBThread* thread);
 
     bool getIsDBThreadRunning() const;
     void setIsDBThreadRunning(bool value);
-
-    friend class DBThread;
 };
 
 #endif
