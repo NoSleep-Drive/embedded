@@ -6,9 +6,9 @@ void DBThreadMonitoring::startDBMonitoring() {
     while (true) {
         if (!isDBThreadRunning && !threadQueue.empty()) {
             isDBThreadRunning = true;
-            std::thread& t = threadQueue.front();
-            t.join();
+            std::thread t = std::move(threadQueue.front());
             threadQueue.pop();
+            t.detach();
         }
     }
 }
