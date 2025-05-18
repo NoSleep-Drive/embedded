@@ -52,7 +52,7 @@ void DBThreadMonitoring::addDBThread(DBThread* thread) {
 }
 
 bool DBThreadMonitoring::getIsDBThreadRunning() const {
-    return isDBThreadRunning;
+    return isDBThreadRunning.load();
 }
 
 void DBThreadMonitoring::setIsDBThreadRunning(bool value) {

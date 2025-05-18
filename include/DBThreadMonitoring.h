@@ -11,7 +11,7 @@ class DBThread;
 
 class DBThreadMonitoring {
 private:
-    bool isDBThreadRunning = false;
+    std::atomic<bool> isDBThreadRunning = false;
     std::queue<DBThread*> threadQueue;
     std::unordered_set<DBThread*> activeThreads;
     std::mutex queueMutex;
