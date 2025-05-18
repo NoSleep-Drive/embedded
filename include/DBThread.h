@@ -14,6 +14,8 @@ private:
     std::string folderPath;
     DBThreadMonitoring* monitoring;
 
+    void deleteFolderSafe(const std::string& path);
+
 public:
     DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor);
     bool sendDataToDB();

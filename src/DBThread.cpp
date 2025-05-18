@@ -10,6 +10,16 @@ DBThread::DBThread(const std::string& uid, const std::string& folder, DBThreadMo
     time = std::filesystem::last_write_time(folderPath);
 }
 
+void DBThread::deleteFolderSafe(const std::string& path) {
+    try {
+        std::filesystem::remove_all(path);
+        std::cout << "[DBThread] 폴더 삭제 성공: " << path << std::endl;
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "[DBThread] 폴더 삭제 실패: " << e.what() << std::endl;
+    }
+}
+
 bool DBThread::sendDataToDB() {
     VideoEncoder encoder;
     std::cout << "백서버 통신 전 이미지 데이터들을 영상 데이터로 변환" << std::endl;
@@ -33,12 +43,7 @@ bool DBThread::sendDataToDB() {
 
         if (backendResponse) {
             std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
-            try {
-                std::filesystem::remove_all(folderPath);
-            }
-            catch (const std::filesystem::filesystem_error& e) {
-                std::cerr << "DBThread 중 폴더 삭제 실패: " << e.what() << std::endl;
-            }
+            deleteFolderSafe(folderPath);
             setIsDBThreadRunningFalse();
             return true;
         }
@@ -47,7 +52,7 @@ bool DBThread::sendDataToDB() {
     }
 
     std::cerr << "백엔드 전송 실패, 로컬 폴더 삭제 : " << folderPath << std::endl;
-    std::filesystem::remove_all(folderPath);
+    deleteFolderSafe(folderPath);
 
     setIsDBThreadRunningFalse();
     return false;
