@@ -4,9 +4,16 @@
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
-
+#include <fstream>
 namespace fs = std::filesystem;
 
+void setEnvVar(const std::string& key, const std::string& value) {
+#ifdef _WIN32
+    _putenv_s(key.c_str(), value.c_str());
+#else
+    setenv(key.c_str(), value.c_str(), 1);
+#endif
+}
 
 Utils::Utils(const std::string& saveDirectory) 
     : saveDirectory(saveDirectory), recentFolder("/recent"), sleepFolder("")
@@ -86,4 +93,25 @@ std::string Utils::createSleepinessDir(const std::string& timeStamp){
 
     this->sleepFolder = path;
     return path;
+}
+
+void Utils::loadEnvFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Could not open .env file\n";
+        return;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue;
+
+        size_t delimiterPos = line.find('=');
+        if (delimiterPos == std::string::npos) continue;
+
+        std::string key = line.substr(0, delimiterPos);
+        std::string value = line.substr(delimiterPos + 1);
+
+        setEnvVar(key, value); 
+    }
 }
