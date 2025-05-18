@@ -1,4 +1,6 @@
 #include "../include/Device.h"
+#include <cpr/cpr.h>
+#include "../include/Utils.h"
 
 Device::Device() : isConnected(false), isDeviceChanged(false) {
 	// 장치 상태 벡터: [0] = 카메라, [1] = 가속도 센서, [2] = 스피커
@@ -28,5 +30,29 @@ void Device::updateDeviceStatus(int deviceIndex, bool status) {
 }
 
 void Device::sendDeviceStatus() {
-	// TODO: 추후 개발
+    std::string hash = getenv("EMBEDDED_HASH");
+    std::string deviceUid = getenv("DEVICE_UID");
+    std::string serverIP = getenv("SERVER_IP");
+
+    cpr::Header headers = {
+        {"Content-Type", "application/json; charset=utf-8"},
+        {"Authorization", "Bearer "+ hash}
+    };
+    std::string status_1 = deviceStatus[0] ? "true" : "false";
+    std::string status_2 = deviceStatus[1] ? "true" : "false";
+    std::string status_3 = deviceStatus[2] ? "true" : "false";
+
+
+    std::string jsonBody = "{"
+        "\"deviceUid\": \"" + deviceUid + "\","
+        "\"cameraState\": " + status_1 + ","
+        "\"accelerationSensorState\": " + status_2 + ","
+        "\"speakerState\": " + status_3+
+        "}";
+
+    cpr::Response r = cpr::Patch(
+        cpr::Url{ serverIP + "/vehicles/status" },
+        headers,
+        cpr::Body{ jsonBody }
+    );
 }
