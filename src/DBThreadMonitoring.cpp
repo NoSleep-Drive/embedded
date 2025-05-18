@@ -33,7 +33,7 @@ void DBThreadMonitoring::processThreadQueue() {
                 thread->sendDataToDB();
                 removeActiveThread(generateThreadKey(thread->getDeviceUid(), thread->getFolderPath()));
                 }).detach();
-                lock.lock();
+            lock.lock();
         }
     }
 }
@@ -58,6 +58,7 @@ void DBThreadMonitoring::addDBThread(DBThread* thread) {
 void DBThreadMonitoring::removeActiveThread(const std::string& key) {
     std::unique_lock<std::mutex> lock(queueMutex);
     activeThreadKeys.erase(key);
+    lock.unlock();
     condition.notify_all();
 }
 
@@ -66,7 +67,6 @@ bool DBThreadMonitoring::getIsDBThreadRunning() const {
 }
 
 void DBThreadMonitoring::setIsDBThreadRunning(bool value) {
-    std::unique_lock<std::mutex> lock(queueMutex);
-    isDBThreadRunning = value;
+    isDBThreadRunning.store(value, std::memory_order_release);
     condition.notify_all();
 }
