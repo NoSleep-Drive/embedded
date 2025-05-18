@@ -1,5 +1,7 @@
 #include "../include/DBThread.h"
 #include "../include/DBThreadMonitoring.h"
+#include <opencv2/opencv.hpp>
+#include <vector>
 #include <iostream>
 #include <filesystem>
 #include <thread>
@@ -13,7 +15,7 @@ bool DBThread::sendDataToDB() {
     VideoEncoder encoder;
     std::cout << "백서버 통신 전 이미지 데이터들을 영상 데이터로 변환" << std::endl;
     // TODO: 파일 경로 기준으로 5초간의 이미지를 추적 -> 임베디드 파일 시스템 경로에 따라 로직 수정 예정
-    encoder.convertFramesToMP4(folderPath);
+    std::vector<uchar> videoData = encoder.convertFramesToMP4(folderPath);
 
     std::cout << "DB 저장 요청을 보낼 라즈베리 파이 UID: " << deviceUid << std::endl;
 
