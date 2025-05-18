@@ -117,7 +117,45 @@ bool initializePython() {
 	import_array();
 
 	// Add current directory to Python path
-	PyRun_SimpleString("import sys; sys.path.append('.')");
+	PyRun_SimpleString(
+			"import sys; sys.path.append('.'); sys.path.append('..'); sys.path.append('../python')");
+
+	// Import our eye_detection_lib module and initialize it
+	PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
+	if (pModule == nullptr) {
+		PyErr_Print();
+		std::cerr << "Failed to import eye_detection_lib module" << std::endl;
+		return false;
+	}
+
+	// Call initialize function
+	PyObject* pFunc = PyObject_GetAttrString(pModule, "initialize");
+	if (pFunc == nullptr || !PyCallable_Check(pFunc)) {
+		if (PyErr_Occurred()) PyErr_Print();
+		std::cerr << "Cannot find function 'initialize'" << std::endl;
+		Py_XDECREF(pFunc);
+		Py_DECREF(pModule);
+		return false;
+	}
+
+	// Call the initialize function
+	PyObject* pValue = PyObject_CallObject(pFunc, nullptr);
+	bool result = false;
+
+	if (pValue != nullptr) {
+		result = PyObject_IsTrue(pValue);
+		Py_DECREF(pValue);
+	} else {
+		PyErr_Print();
+	}
+
+	Py_XDECREF(pFunc);
+	Py_DECREF(pModule);
+
+	if (!result) {
+		std::cerr << "Failed to initialize eye detection module" << std::endl;
+		return false;
+	}
 
 	std::cout << "Python initialization completed!" << std::endl;
 	return true;
@@ -138,14 +176,12 @@ bool detectEyeClosure(const cv::Mat& frame) {
 	bool result = false;
 
 	try {
-		// Import eye_detection module
-		PyObject* pName = PyUnicode_DecodeFSDefault("eye_detection");
-		PyObject* pModule = PyImport_Import(pName);
-		Py_DECREF(pName);
+		// Import eye_detection_lib module
+		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
 
 		if (pModule == nullptr) {
 			PyErr_Print();
-			std::cerr << "Failed to import eye_detection module" << std::endl;
+			std::cerr << "Failed to import eye_detection_lib module" << std::endl;
 			PyGILState_Release(gstate);
 			return false;
 		}
@@ -179,7 +215,6 @@ bool detectEyeClosure(const cv::Mat& frame) {
 		}
 
 		// Hard-coded threshold for testing purposes
-		// In a real implementation, this should be read from the Python module
 		float threshold = 0.25f;
 		PyObject* pThreshold = PyFloat_FromDouble(threshold);
 
