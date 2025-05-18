@@ -31,7 +31,7 @@ void DBThreadMonitoring::processThreadQueue() {
             lock.unlock();
             std::thread([thread, this] {
                 thread->sendDataToDB();
-                removeActiveThread(generateThreadKey(thread->getDeviceUid(), thread->getFolderPath())); // 🔧 중복 제거
+                removeActiveThread(generateThreadKey(thread->getDeviceUid(), thread->getFolderPath()));
                 }).detach();
                 lock.lock();
         }
@@ -45,7 +45,9 @@ void DBThreadMonitoring::addDBThread(DBThread* thread) {
     if (activeThreadKeys.find(threadKey) == activeThreadKeys.end()) {
         activeThreadKeys.insert(threadKey);
         threadQueue.push(thread);
+        lock.unlock();
         condition.notify_one();
+        lock.lock();
         std::cout << "DBThread 추가됨, 큐 크기: " << threadQueue.size() << std::endl;
     }
     else {
