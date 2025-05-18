@@ -16,3 +16,11 @@ void DBThreadMonitoring::startDBMonitoring() {
 void DBThreadMonitoring::startDBThread(DBThread* thread) {
     threadQueue.push(std::thread(&DBThread::sendDataToDB, thread));
 }
+
+bool DBThreadMonitoring::getIsDBThreadRunning() const {
+    return isDBThreadRunning;
+}
+
+void DBThreadMonitoring::setIsDBThreadRunning(bool value) {
+    isDBThreadRunning = value;
+}

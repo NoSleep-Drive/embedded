@@ -16,6 +16,9 @@ public:
     void startDBMonitoring();
     void startDBThread(DBThread* thread);
 
+    bool getIsDBThreadRunning() const;
+    void setIsDBThreadRunning(bool value);
+
     friend class DBThread;
 };
 
