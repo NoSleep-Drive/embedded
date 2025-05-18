@@ -3,6 +3,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 #include "VideoEncoder.h"
 
 class DBThreadMonitoring;
@@ -20,6 +21,9 @@ public:
     DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor);
     bool sendDataToDB();
     void setIsDBThreadRunningFalse();
+
+    std::string getDeviceUid() const { return deviceUid; }
+    std::string getFolderPath() const { return folderPath; }
 };
 
 #endif

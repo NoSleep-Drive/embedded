@@ -2,6 +2,10 @@
 #include "../include/DBThread.h"
 #include <iostream>
 
+std::string DBThreadMonitoring::generateThreadKey(const std::string& deviceUid, const std::string& folderPath) {
+    return deviceUid + "::" + folderPath;
+}
+
 DBThreadMonitoring::DBThreadMonitoring() {
     startDBMonitoring();
 }
@@ -24,16 +28,11 @@ void DBThreadMonitoring::processThreadQueue() {
             DBThread* thread = threadQueue.front();
             threadQueue.pop();
 
-            activeThreads.insert(thread);
             lock.unlock();
-
             std::thread([thread, this] {
                 thread->sendDataToDB();
-                std::unique_lock<std::mutex> lock(queueMutex);
-                activeThreads.erase(thread);
-                condition.notify_all();
+                removeActiveThread(generateThreadKey(thread->getDeviceUid(), thread->getFolderPath())); // 🔧 중복 제거
                 }).detach();
-
                 lock.lock();
         }
     }
@@ -41,14 +40,23 @@ void DBThreadMonitoring::processThreadQueue() {
 
 void DBThreadMonitoring::addDBThread(DBThread* thread) {
     std::unique_lock<std::mutex> lock(queueMutex);
-    if (activeThreads.find(thread) == activeThreads.end()) {
+    std::string threadKey = generateThreadKey(thread->getDeviceUid(), thread->getFolderPath());
+
+    if (activeThreadKeys.find(threadKey) == activeThreadKeys.end()) {
+        activeThreadKeys.insert(threadKey);
         threadQueue.push(thread);
         condition.notify_one();
         std::cout << "DBThread 추가됨, 큐 크기: " << threadQueue.size() << std::endl;
     }
     else {
-        std::cout << "이미 실행 중인 스레드입니다." << std::endl;
+        std::cout << "이미 실행 중인 스레드입니다 : " << threadKey << std::endl;
     }
+}
+
+void DBThreadMonitoring::removeActiveThread(const std::string& key) {
+    std::unique_lock<std::mutex> lock(queueMutex);
+    activeThreadKeys.erase(key);
+    condition.notify_all();
 }
 
 bool DBThreadMonitoring::getIsDBThreadRunning() const {

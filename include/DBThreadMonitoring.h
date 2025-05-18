@@ -6,6 +6,7 @@
 #include <mutex>
 #include <unordered_set>
 #include <condition_variable>
+#include <string>
 
 class DBThread;
 
@@ -13,11 +14,12 @@ class DBThreadMonitoring {
 private:
     std::atomic<bool> isDBThreadRunning = false;
     std::queue<DBThread*> threadQueue;
-    std::unordered_set<DBThread*> activeThreads;
+    std::unordered_set<std::string> activeThreadKeys;
     std::mutex queueMutex;
     std::condition_variable condition;
 
     void processThreadQueue();
+    std::string generateThreadKey(const std::string& deviceUid, const std::string& folderPath);
 
 public:
     DBThreadMonitoring();
@@ -26,6 +28,7 @@ public:
 
     bool getIsDBThreadRunning() const;
     void setIsDBThreadRunning(bool value);
+    void removeActiveThread(const std::string& key);
 };
 
 #endif
