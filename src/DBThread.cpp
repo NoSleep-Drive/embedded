@@ -1,6 +1,5 @@
 #include "../include/DBThread.h"
 #include "../include/DBThreadMonitoring.h"
-#include <opencv2/opencv.hpp>
 #include <vector>
 #include <iostream>
 #include <filesystem>
@@ -34,7 +33,12 @@ bool DBThread::sendDataToDB() {
 
         if (backendResponse) {
             std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
-            std::filesystem::remove_all(folderPath);
+            try {
+                std::filesystem::remove_all(folderPath);
+            }
+            catch (const std::filesystem::filesystem_error& e) {
+                std::cerr << "DBThread 중 폴더 삭제 실패: " << e.what() << std::endl;
+            }
             setIsDBThreadRunningFalse();
             return true;
         }
