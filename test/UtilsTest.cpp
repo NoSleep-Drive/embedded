@@ -14,5 +14,7 @@ int main() {
 		test.saveFrameToCurrentFrameFolder(var, name);
 	}
 
+	//test.removeFolder(path);
+
 	return 0;
 }
