@@ -4,6 +4,11 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 
+#include <cstdlib>
+#include <string>
+
+void setEnvVar(const std::string& key, const std::string& value);
+
 class Utils {
 public:
     Utils(const std::string& saveDirectory = "./frames");
@@ -21,6 +26,8 @@ public:
     std::vector<cv::Mat> loadFramesFromFolder(const std::string& folderPath);
 
     std::string createSleepinessDir(const std::string& timeStamp);
+
+    void loadEnvFile(const std::string& filename);
 
 private:
     std::string saveDirectory;
