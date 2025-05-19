@@ -8,7 +8,7 @@
 class VideoEncoder {
 private:
     const int frameRate = 24;
-    const int resolution[2] = { 720, 1280 };
+    const cv::Size resolution = cv::Size(1280, 720);
 
 public:
     std::vector<uchar> convertFramesToMP4(const std::string& path);

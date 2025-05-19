@@ -19,6 +19,7 @@ private:
 
 public:
     DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor);
+    ~DBThread();
     bool sendDataToDB();
     void setIsDBThreadRunningFalse();
 
