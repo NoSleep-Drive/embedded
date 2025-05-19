@@ -2,7 +2,7 @@
 
 #include "../include/Camera.h"
 
-int main() {
+int runCameraTest() {
 	std::cout << "NoSleep Drive - Camera Class Test" << std::endl;
 	std::cout << "======================================" << std::endl;
 
