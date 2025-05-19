@@ -56,7 +56,7 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
         return videoBuffer;
     }
 
-    cv::Size frameSize(resolution[1], resolution[0]);
+    const cv::Size frameSize(1280, 720);
     auto tmp = std::filesystem::temp_directory_path() / ("video_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
     std::string tempVideoPath = tmp.string();
     cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate, frameSize);
