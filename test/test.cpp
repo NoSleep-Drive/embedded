@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../include/Camera.h"
+#include "../include/EyeClosureQueueManagement.h"
 
 bool removeLight(const cv::Mat& input, cv::Mat& lChannel, cv::Mat& composed) {
 	std::cout << "\n----- Image Preprocessing Started -----" << std::endl;
@@ -293,6 +294,9 @@ int runEyeDetectionTest(int argc, char** argv) {
 	std::vector<int> resolution = camera.getResolution();
 	std::cout << "Camera resolution: " << resolution[0] << "x" << resolution[1] << std::endl;
 
+	// Create EyeClosureQueueManagement object
+	EyeClosureQueueManagement queueManager;
+
 	// Start testing
 	for (int i = 0; i < iterations; ++i) {
 		std::cout << "\n===== Test #" << (i + 1) << " =====" << std::endl;
@@ -324,6 +328,9 @@ int runEyeDetectionTest(int argc, char** argv) {
 		cv::putText(displayFrame, eyeStatus, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0,
 								eyesClosed ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0), 2);
 
+		// Save eye status to queue
+		queueManager.saveEyeClosureStatus(eyesClosed);
+
 		cv::imshow("Original Image with Eye Status", displayFrame);
 		cv::imshow("L Channel", lChannel);
 		cv::imshow("Processed Image", processed);
@@ -335,6 +342,15 @@ int runEyeDetectionTest(int argc, char** argv) {
 			break;
 		}
 	}
+
+	// Print eye closure history
+	std::cout << "\nEye Closure History: ";
+	std::queue<bool> history = queueManager.getEyeClosureHistory();
+	while (!history.empty()) {
+		std::cout << (history.front() ? "EYES CLOSED" : "EYES OPEN") << " ";
+		history.pop();
+	}
+	std::cout << std::endl;
 
 	// Cleanup
 	cv::destroyAllWindows();
