@@ -34,82 +34,20 @@ bool DBThread::sendDataToDB() {
         return false;
     }
 
-    const int MAX_RETRIES = 5;
-    const int RETRY_DELAY_MS = 1000;
-    bool backendResponse = false;
-    int attempt = 0;
+    bool success = sendVideoToBackend(videoData);
 
-    while (!backendResponse && attempt < MAX_RETRIES) {
-        std::cout << "백엔드 서버 통신 " << (attempt + 1) << " 번째 시도" << std::endl;
-
-        std::string hash = getenv("EMBEDDED_HASH");
-        std::string deviceUid = getenv("DEVICE_UID");
-        std::string serverIP = getenv("SERVER_IP");
-
-        if (hash.empty() || deviceUid.empty() || serverIP.empty()) {
-            std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
-            setIsDBThreadRunningFalse();
-            return false;
-        }
-
-        std::string detectedAt = getDetectedAtFromFolder();
-        if (detectedAt.empty()) {
-            std::cerr << "detectedAt 추출 실패" << std::endl;
-            setIsDBThreadRunningFalse();
-            return false;
-        }
-
-        std::string tempVideoPath = (std::filesystem::temp_directory_path() / "temp_video.mp4").string();
-        std::ofstream outFile(tempVideoPath, std::ios::binary);
-        outFile.write(reinterpret_cast<const char*>(videoData.data()), videoData.size());
-        outFile.close();
-
-        cpr::Header headers = {
-            {"Authorization", "Bearer " + hash},
-            {"Content-Type", "multipart/form-data"}
-        };
-
-        cpr::Multipart multipart{
-            {"deviceUid", deviceUid},
-            {"detectedAt", detectedAt},
-            {"videoFile", cpr::File{tempVideoPath, "video/mp4"}}
-        };
-
-        std::string url = serverIP + "/sleep";
-        cpr::Response r = cpr::Post(cpr::Url{ url }, headers, multipart);
-
-        if (r.status_code == 200 && r.text.find("졸음 감지 데이터가 저장되었습니다.") != std::string::npos) {
-            backendResponse = true;
-        }
-        else {
-            std::cerr << "백엔드 응답 실패 (" << r.status_code << "): " << r.error.message << "\n응답 본문: " << r.text << std::endl;
-        }
-
-
-        try {
-            std::filesystem::remove(tempVideoPath);
-        }
-        catch (const std::exception& e) {
-            std::cerr << "임시 영상 파일 삭제 실패: " << e.what() << std::endl;
-        }
-
-
-
-        if (backendResponse) {
-            std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
-            deleteFolderSafe(folderPath);
-            setIsDBThreadRunningFalse();
-            return true;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
-        attempt++;
+    if (success) {
+        std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
+        deleteFolderSafe(folderPath);
+        setIsDBThreadRunningFalse();
+        return true;
     }
-
-    std::cerr << "백엔드 전송 실패, 로컬 폴더 삭제 : " << folderPath << std::endl;
-    deleteFolderSafe(folderPath);
-
-    setIsDBThreadRunningFalse();
-    return false;
+    else {
+        std::cerr << "백엔드 전송 실패, 로컬 폴더 삭제 : " << folderPath << std::endl;
+        deleteFolderSafe(folderPath);
+        setIsDBThreadRunningFalse();
+        return false;
+    }
 }
 
 void DBThread::setIsDBThreadRunningFalse() {
@@ -134,3 +72,70 @@ std::string DBThread::getDetectedAtFromFolder() const {
     return std::string(timeStr);
 }
 
+bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
+    const int MAX_RETRIES = 5;
+    const int RETRY_DELAY_MS = 1000;
+    bool backendResponse = false;
+    int attempt = 0;
+
+    while (!backendResponse && attempt < MAX_RETRIES) {
+        std::cout << "백엔드 서버 통신 " << (attempt + 1) << " 번째 시도" << std::endl;
+
+        std::string hash = getenv("EMBEDDED_HASH");
+        std::string deviceUidEnv = getenv("DEVICE_UID");
+        std::string serverIP = getenv("SERVER_IP");
+
+        if (hash.empty() || deviceUidEnv.empty() || serverIP.empty()) {
+            std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
+            return false;
+        }
+
+        std::string detectedAt = getDetectedAtFromFolder();
+        if (detectedAt.empty()) {
+            std::cerr << "detectedAt 추출 실패" << std::endl;
+            return false;
+        }
+
+        std::string tempVideoPath = (std::filesystem::temp_directory_path() / "temp_video.mp4").string();
+        std::ofstream outFile(tempVideoPath, std::ios::binary);
+        outFile.write(reinterpret_cast<const char*>(videoData.data()), videoData.size());
+        outFile.close();
+
+        cpr::Header headers = {
+            {"Authorization", "Bearer " + hash},
+            {"Content-Type", "multipart/form-data"}
+        };
+
+        cpr::Multipart multipart{
+            {"deviceUid", deviceUidEnv},
+            {"detectedAt", detectedAt},
+            {"videoFile", cpr::File{tempVideoPath, "video/mp4"}}
+        };
+
+        std::string url = serverIP + "/sleep";
+        cpr::Response r = cpr::Post(cpr::Url{ url }, headers, multipart);
+
+        if (r.status_code == 200 && r.text.find("졸음 감지 데이터가 저장되었습니다.") != std::string::npos) {
+            backendResponse = true;
+        }
+        else {
+            std::cerr << "백엔드 응답 실패 (" << r.status_code << "): " << r.error.message << "\n응답 본문: " << r.text << std::endl;
+        }
+
+        try {
+            std::filesystem::remove(tempVideoPath);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "임시 영상 파일 삭제 실패: " << e.what() << std::endl;
+        }
+
+        if (backendResponse) {
+            return true;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));
+        attempt++;
+    }
+
+    return false;
+}

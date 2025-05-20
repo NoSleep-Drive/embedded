@@ -21,6 +21,7 @@ public:
     DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor);
     ~DBThread();
     bool sendDataToDB();
+    bool sendVideoToBackend(const std::vector<uchar>& videoData);
     void setIsDBThreadRunningFalse();
     std::string getDetectedAtFromFolder() const;
 
