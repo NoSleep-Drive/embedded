@@ -345,10 +345,9 @@ int runEyeDetectionTest(int argc, char** argv) {
 
 	// Print eye closure history
 	std::cout << "\nEye Closure History: ";
-	std::queue<bool> history = queueManager.getEyeClosureHistory();
-	while (!history.empty()) {
-		std::cout << (history.front() ? "EYES CLOSED" : "EYES OPEN") << " ";
-		history.pop();
+	std::deque<bool> history = queueManager.getEyeClosureHistory();
+	for (const auto& status : history) {
+		std::cout << (status ? "EYES CLOSED" : "EYES OPEN") << " ";
 	}
 	std::cout << std::endl;
 

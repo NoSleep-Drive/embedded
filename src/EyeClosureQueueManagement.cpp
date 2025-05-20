@@ -17,7 +17,7 @@ std::deque<bool> EyeClosureQueueManagement::getEyeClosureHistory() {
 	return eyeClosureDeque;
 }
 
-bool EyeClosureQueueManagement::saveEyeClosureStatus(bool eyeClosed) {
+void EyeClosureQueueManagement::saveEyeClosureStatus(bool eyeClosed) {
 	// 덱이 최대 크기에 도달했으면 가장 오래된 데이터 제거
 	if (eyeClosureDeque.size() >= MAX_DEQUE_SIZE) {
 		eyeClosureDeque.pop_front();
@@ -25,8 +25,6 @@ bool EyeClosureQueueManagement::saveEyeClosureStatus(bool eyeClosed) {
 
 	// 새 데이터 추가
 	eyeClosureDeque.push_back(eyeClosed);
-
-	return eyeClosed;
 }
 
 bool EyeClosureQueueManagement::detectSleepiness() {
