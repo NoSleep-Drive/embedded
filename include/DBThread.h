@@ -22,6 +22,7 @@ public:
     ~DBThread();
     bool sendDataToDB();
     void setIsDBThreadRunningFalse();
+    std::string getDetectedAtFromFolder() const;
 
     const std::string& getDeviceUid() const { return deviceUid; }
     const std::string& getFolderPath() const { return folderPath; }
