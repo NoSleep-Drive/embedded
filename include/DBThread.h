@@ -4,6 +4,7 @@
 #include <string>
 #include <filesystem>
 #include <vector>
+#include <opencv2/core.hpp> 
 #include "VideoEncoder.h"
 
 class DBThreadMonitoring;
@@ -21,7 +22,9 @@ public:
     DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor);
     ~DBThread();
     bool sendDataToDB();
+    bool sendVideoToBackend(const std::vector<uchar>& videoData);
     void setIsDBThreadRunningFalse();
+    std::string getDetectedAtFromFolder() const;
 
     const std::string& getDeviceUid() const { return deviceUid; }
     const std::string& getFolderPath() const { return folderPath; }
