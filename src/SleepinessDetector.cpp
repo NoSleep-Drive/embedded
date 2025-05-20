@@ -7,6 +7,7 @@
 #include <opencv2/opencv.hpp>
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
+#include <filesystem>
 
 SleepinessDetector::SleepinessDetector() {
     sleepImgPath = "./frames";
@@ -31,7 +32,7 @@ bool SleepinessDetector::requestAIDetection(const std::string& uid, const std::s
     std::string serverIP(ipC);
 
 
-    std::string url = serverIP + "/diagnosis/drawiness?deviceUid=" + cpr::util::urlEncode(deviceUidEnv);
+    std::string url = serverIP + "/diagnosis/drowiness?deviceUid=" + cpr::util::urlEncode(deviceUidEnv);
 
     cpr::Response r = cpr::Get(cpr::Url{ url });
 
