@@ -85,14 +85,19 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
     while (!backendResponse && attempt < MAX_RETRIES) {
         std::cout << "백엔드 서버 통신 " << (attempt + 1) << " 번째 시도" << std::endl;
 
-        std::string hash = getenv("EMBEDDED_HASH");
-        std::string deviceUidEnv = getenv("DEVICE_UID");
-        std::string serverIP = getenv("SERVER_IP");
+        const char* hashC = std::getenv("EMBEDDED_HASH");
+        const char* uidC = std::getenv("DEVICE_UID");
+        const char* ipC = std::getenv("SERVER_IP");
 
-        if (hash.empty() || deviceUidEnv.empty() || serverIP.empty()) {
+        if (!hashC || !uidC || !ipC) {
             std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
             return false;
         }
+
+        std::string hash(hashC);
+        std::string deviceUidEnv(uidC);
+        std::string serverIP(ipC);
+
 
         std::string detectedAt = getDetectedAtFromFolder();
         if (detectedAt.empty()) {
