@@ -2,11 +2,13 @@
 #include "../include/DBThreadMonitoring.h"
 #include <vector>
 #include <iostream>
+#include <sstream> 
 #include <fstream>
 #include <filesystem>
 #include <thread>
 #include <cpr/cpr.h>
 #include <ctime>
+#include <random>
 
 DBThread::DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor)
     : deviceUid(uid), folderPath(folder), monitoring(monitor) {
@@ -96,7 +98,7 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
             return false;
         }
 
-        std::string tempVideoPath = (std::filesystem::temp_directory_path() / "temp_video.mp4").string();
+        std::string tempVideoPath = generateTempFilePath();
         std::ofstream outFile(tempVideoPath, std::ios::binary);
         outFile.write(reinterpret_cast<const char*>(videoData.data()), videoData.size());
         outFile.close();
@@ -138,3 +140,22 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 
     return false;
 }
+
+namespace {
+    std::string generateTempFilePath() {
+        std::stringstream ss;
+        ss << std::filesystem::temp_directory_path().string();
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(0, 15);
+        ss << "temp_video_";
+        for (int i = 0; i < 8; ++i) {
+            ss << std::hex << dis(gen);
+        }
+        ss << ".mp4";
+
+        return ss.str();
+    }
+}
+
