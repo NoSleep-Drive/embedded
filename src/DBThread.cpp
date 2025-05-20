@@ -9,6 +9,8 @@
 #include <cpr/cpr.h>
 #include <ctime>
 #include <random>
+#include <iomanip>
+#include <chrono>
 
 DBThread::DBThread(const std::string& uid, const std::string& folder, DBThreadMonitoring* monitor)
     : deviceUid(uid), folderPath(folder), monitoring(monitor) {
