@@ -102,8 +102,7 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
         outFile.close();
 
         cpr::Header headers = {
-            {"Authorization", "Bearer " + hash},
-            {"Content-Type", "multipart/form-data"}
+            {"Authorization", "Bearer " + hash}
         };
 
         cpr::Multipart multipart{
