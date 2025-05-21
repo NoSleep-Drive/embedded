@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
@@ -16,7 +17,7 @@
 #include "Camera.h"
 #include "DBThreadMonitoring.h"
 #include "EyeClosureQueueManagement.h"
-// #include "SleepinessDetector.h"
+#include "SleepinessDetector.h"
 #include "Speaker.h"
 #include "Utils.h"
 
@@ -26,7 +27,7 @@ private:
 	std::unique_ptr<Camera> camera;
 	std::unique_ptr<AccelerationSensor> accelerationSensor;
 	std::unique_ptr<Speaker> speaker;
-	// std::unique_ptr<SleepinessDetector> sleepinessDetector;
+	std::unique_ptr<SleepinessDetector> sleepinessDetector;
 	std::unique_ptr<EyeClosureQueueManagement> eyeClosureQueue;
 	std::unique_ptr<Utils> utils;
 	std::unique_ptr<DBThreadMonitoring> threadMonitor;
@@ -50,6 +51,8 @@ private:
 	bool processSingleFrame();
 	bool requestDiagnosis();
 	void initializeDevices();
+	void handleVehicleStopped();
+	void handleSleepinessDetected(const std::string& timestamp);
 
 public:
 	FirmwareManager(const std::string& uid = "rasp-0001");

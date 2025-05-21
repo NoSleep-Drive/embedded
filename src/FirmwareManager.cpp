@@ -4,11 +4,13 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <opencv2/opencv.hpp>
 #include <sstream>
 #include <thread>
 
 #include "../include/DBThread.h"
+#include "../include/SleepinessDetector.h"
 
 // NumPy 배열 초기화를 위한 헬퍼 함수
 bool initializePythonAndNumpy() {
@@ -25,21 +27,27 @@ bool initializePythonAndNumpy() {
 
 FirmwareManager::FirmwareManager(const std::string& uid)
 		: deviceUID(uid), isRunning(false), isPaused(false), frameCycle(0), diagnosticCycle(0) {
+	std::cout << "NoSleep Drive 펌웨어 매니저 초기화 중 (ID: " << uid << ")..." << std::endl;
+
 	// 객체들 초기화
 	camera = std::make_unique<Camera>();
 	accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
-	speaker = std::make_unique<Speaker>();														// Speaker 클래스 필요
-	// sleepinessDetector = std::make_unique<SleepinessDetector>();	// SleepinessDetector 클래스 필요
+	speaker = std::make_unique<Speaker>();
+	sleepinessDetector = std::make_unique<SleepinessDetector>();
 	eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
 	utils = std::make_unique<Utils>("./frames");
 	threadMonitor = std::make_unique<DBThreadMonitoring>();
 
+	// 환경 변수에 장치 UID 설정
+	setEnvVar("DEVICE_UID", deviceUID);
+
 	// Python 및 NumPy 초기화
 	if (!initializePythonAndNumpy()) {
-		std::cerr << "Failed to initialize Python/NumPy" << std::endl;
+		std::cerr << "Python/NumPy 초기화 실패" << std::endl;
+		throw std::runtime_error("Python/NumPy 초기화 실패");
 	}
 
-	// Python 모듈 로드
+	// Python 모듈 로드 (눈 감음 감지 라이브러리)
 	PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
 	if (pModule == nullptr) {
 		PyErr_Print();
@@ -63,7 +71,8 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 		Py_DECREF(pModule);
 	}
 
-	std::cout << "FirmwareManager initialized with UID: " << deviceUID << std::endl;
+	// 스레드 모니터링 시작
+	threadMonitor->startDBMonitoring();
 }
 
 FirmwareManager::~FirmwareManager() {
@@ -78,12 +87,31 @@ FirmwareManager::~FirmwareManager() {
 void FirmwareManager::initializeDevices() {
 	std::cout << "Initializing devices..." << std::endl;
 
-	// 장치 초기화
-	camera->initialize();
-	accelerationSensor->initialize();
-	// speaker->initialize();
+	try {
+		// 장치 초기화
+		camera->initialize();
+		accelerationSensor->initialize();
+		speaker->initialize();
 
-	std::cout << "All devices initialized" << std::endl;
+		// 장치 상태 확인
+		if (!camera->getConnectionStatus()) {
+			std::cerr << "경고: 카메라가 제대로 초기화되지 않았습니다." << std::endl;
+		}
+
+		if (!accelerationSensor->getConnectionStatus()) {
+			std::cerr << "경고: 가속도 센서가 제대로 초기화되지 않았습니다." << std::endl;
+		}
+
+		if (!speaker->getConnectionStatus()) {
+			std::cerr << "경고: 스피커가 제대로 초기화되지 않았습니다." << std::endl;
+		}
+
+	} catch (const std::exception& e) {
+		std::cerr << "장치 초기화 중 오류 발생: " << e.what() << std::endl;
+		throw;
+	}
+
+	std::cout << "모든 장치 초기화 완료" << std::endl;
 }
 
 void FirmwareManager::start() {
@@ -109,6 +137,7 @@ void FirmwareManager::stop() {
 		return;
 	}
 
+	std::cout << "FirmwareManager 정지 중..." << std::endl;
 	isRunning.store(false);
 
 	if (mainThread.joinable()) {
@@ -142,19 +171,27 @@ void FirmwareManager::mainLoop() {
 	const auto frameInterval = std::chrono::microseconds(42000);	// 0.042초 (42ms)
 	auto lastFrameTime = std::chrono::high_resolution_clock::now();
 
+	// 실시간 프레임 저장 폴더 생성
+	auto now = std::chrono::system_clock::now();
+	auto now_time_t = std::chrono::system_clock::to_time_t(now);
+	std::stringstream ss;
+	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
+	std::string recentFolder = utils->createSleepinessDir(ss.str() + "_recent");
+
 	while (isRunning.load()) {
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		auto elapsedTime = currentTime - lastFrameTime;
 
-		// 0.042초마다 프레임 처리
+		// 0.042초마다 프레임 처리 (1주기)
 		if (elapsedTime >= frameInterval) {
 			lastFrameTime = currentTime;
 
 			// 차량이 움직이고 있지 않으면 처리하지 않음
 			if (!accelerationSensor->isMoving()) {
 				// 차량이 정차 중일 때 처리 로직
-				// 남은 영상 데이터를 서버에 전송하는 코드 등
-				std::cout << "Vehicle is not moving, skipping processing" << std::endl;
+				handleVehicleStopped();
+
+				// 짧은 대기 후 다음 반복으로
 				std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				continue;
 			}
@@ -168,7 +205,7 @@ void FirmwareManager::mainLoop() {
 			// 프레임 처리
 			processSingleFrame();
 
-			// 24 주기마다 진단 요청
+			// 24 주기(1초)마다 진단 요청
 			frameCycle++;
 			if (frameCycle >= 24) {
 				frameCycle = 0;
@@ -184,6 +221,20 @@ void FirmwareManager::mainLoop() {
 	std::cout << "Main loop ended" << std::endl;
 }
 
+void FirmwareManager::handleVehicleStopped() {
+	// 차량이 정차 중일 때 처리 로직
+
+	// 백엔드에 전송해야하는 졸음 근거 영상이 남아 있는 경우
+	if (threadMonitor->getIsDBThreadRunning()) {
+		std::cout << "차량 정차 감지: 졸음 근거 영상 전송 중..." << std::endl;
+		// 스레드가 이미 실행 중이므로 추가 작업 없음
+	} else {
+		std::cout << "차량 정차 감지: 실시간 영상 데이터 삭제" << std::endl;
+		// 실시간 영상을 저장하는 폴더 내의 모든 이미지 데이터 삭제
+		utils->removeFolder("recent");
+	}
+}
+
 bool FirmwareManager::processSingleFrame() {
 	// 1. 카메라에서 프레임 가져오기
 	cv::Mat frame = camera->captureFrame();
@@ -193,14 +244,14 @@ bool FirmwareManager::processSingleFrame() {
 	}
 
 	// 2. 이미지 전처리
-	cv::Mat lChannel, processed;
+	cv::Mat preprocessedFrame;
 	try {
 		// 2.1 LAB 변환 및 L 채널 추출
 		cv::Mat lab;
 		cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);
 		std::vector<cv::Mat> labChannels(3);
 		cv::split(lab, labChannels);
-		lChannel = labChannels[0].clone();
+		cv::Mat lChannel = labChannels[0].clone();
 
 		// 2.2 미디안 필터 적용
 		cv::Mat medianL;
@@ -215,7 +266,7 @@ bool FirmwareManager::processSingleFrame() {
 		cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
 
 		// 2.5 그레이스케일과 반전된 L 채널 합성
-		cv::addWeighted(gray, 0.75, invertedL, 0.25, 0, processed);
+		cv::addWeighted(gray, 0.75, invertedL, 0.25, 0, preprocessedFrame);
 	} catch (const cv::Exception& e) {
 		std::cerr << "OpenCV error during preprocessing: " << e.what() << std::endl;
 		return false;
@@ -230,10 +281,11 @@ bool FirmwareManager::processSingleFrame() {
 			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
 			if (pFunc != nullptr && PyCallable_Check(pFunc)) {
 				// cv::Mat을 NumPy 배열로 변환
-				npy_intp dims[3] = {processed.rows, processed.cols, processed.channels()};
+				npy_intp dims[3] = {preprocessedFrame.rows, preprocessedFrame.cols,
+														preprocessedFrame.channels()};
 				PyObject* pArray = PyArray_SimpleNewFromData(
-						processed.channels() == 1 ? 2 : 3, dims,
-						processed.depth() == CV_8U ? NPY_UINT8 : NPY_FLOAT32, processed.data);
+						preprocessedFrame.channels() == 1 ? 2 : 3, dims,
+						preprocessedFrame.depth() == CV_8U ? NPY_UINT8 : NPY_FLOAT32, preprocessedFrame.data);
 
 				// 함수 인자 설정
 				float threshold = 0.25f;
@@ -274,10 +326,11 @@ bool FirmwareManager::processSingleFrame() {
 	ss << std::put_time(std::localtime(&in_time_t), "%Y%m%d_%H%M%S_%03d");
 	std::string timestamp = ss.str();
 
-	utils->saveFrameToSleepinessFolder(resizedFrame, timestamp + ".jpg");
+	// 프레임 저장
+	utils->saveFrameToCurrentFrameFolder(resizedFrame, timestamp + ".jpg");
 
-	// TODO: AI 서버로 진단용 이미지 전송 (실제 구현 필요)
-	// sleepinessDetector->sendDriverFrame(processed);
+	// 6. AI 서버로 이미지 전송
+	sleepinessDetector->sendDriverFrame(preprocessedFrame);
 
 	return true;
 }
@@ -287,41 +340,60 @@ bool FirmwareManager::requestDiagnosis() {
 
 	bool isSleepy = false;
 
-	// 1. 타임스탬프
+	// 1. 타임스탬프 생성
 	auto now = std::chrono::system_clock::now();
 	auto now_time_t = std::chrono::system_clock::to_time_t(now);
 	std::stringstream ss;
 	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
 	std::string timestamp = ss.str();
 
-	// AI 서버 요청 (타임아웃 2.5초)
+	// 2. AI 서버에 진단 요청
 	bool aiResponse = false;
-	// TODO: 추후 sleepinessDetector->requestAIDetection(deviceUID, timestamp) 호출하도록 수정
+	try {
+		aiResponse = sleepinessDetector->requestAIDetection(deviceUID, timestamp);
 
-	if (!aiResponse) {
-		// AI 서버 응답이 없을 경우 로컬 알고리즘으로 판단
-		isSleepy = eyeClosureQueue->detectSleepiness();
-	} else {
-		// AI 서버 응답이 있을 경우 해당 결과 사용
+		// AI 서버 응답에 따라 졸음 판단
+		if (aiResponse) {
+			isSleepy = true;	// AI가 졸음으로 판단한 경우
+			std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
+		}
+	} catch (const std::exception& e) {
+		std::cerr << "AI 서버 진단 요청 중 오류: " << e.what() << std::endl;
+		// 예외 발생 시 aiResponse = false 유지
 	}
 
-	// 졸음으로 판단되면 처리
+	// 3. AI 서버 응답이 없거나 통신 실패 시 로컬 알고리즘 사용
+	if (!aiResponse) {
+		std::cout << "AI 서버 응답 없음, 로컬 알고리즘으로 진단합니다." << std::endl;
+		// 로컬 눈 감음 데이터 기반 졸음 여부 판단
+		isSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
+	}
+
+	// 4. 졸음으로 판단된 경우 처리
 	if (isSleepy) {
-		std::cout << "SLEEPINESS DETECTED! Triggering alert..." << std::endl;
-
-		// 1. 경고음 출력
-		speaker->triggerAlert();
-
-		// 2. 졸음 근거 영상 저장 폴더 생성
-		std::string sleepDir = utils->createSleepinessDir(timestamp);
-
-		// 3. 최근 프레임을 졸음 폴더로 복사 (실제 구현 필요)
-		// utils->saveFrames(sleepDir, startIdx, endIdx);
-
-		// 4. DB 전송 스레드 생성
-		auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
-		threadMonitor->addDBThread(dbThread);
+		handleSleepinessDetected(timestamp);
 	}
 
 	return true;
+}
+
+void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
+	std::cout << "***** 졸음 감지! 알람 작동 *****" << std::endl;
+
+	// 1. 경고음 출력
+	speaker->triggerAlert();
+
+	// 2. 졸음 근거 영상 저장 폴더 생성
+	std::string sleepDir = utils->createSleepinessDir(timestamp);
+	std::cout << "졸음 영상 저장 경로: " << sleepDir << std::endl;
+
+	// 3. 현재까지의 프레임 저장
+	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder();
+
+	// 4. DB 전송 스레드 생성 및 큐에 추가
+	auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
+	threadMonitor->addDBThread(dbThread);
+
+	// 5. 스레드 실행 상태 설정
+	threadMonitor->setIsDBThreadRunning(true);
 }
