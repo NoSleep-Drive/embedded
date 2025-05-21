@@ -20,6 +20,9 @@ find_package(PythonLibs REQUIRED)
 # Python 헤더 파일 경로를 포함 경로에 추가
 include_directories(${PYTHON_INCLUDE_DIRS})
 
+# nlohmann 헤더 파일 경로를 포함 경로에 추가
+include_directories(${PROJECT_SOURCE_DIR}/include) # include 디렉토리에 json.hpp 필요
+
 # src 디렉토리의 모든 .cpp 파일을 자동으로 찾아 SOURCE_FILES 변수에 저장
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp test/*.cpp)
 
