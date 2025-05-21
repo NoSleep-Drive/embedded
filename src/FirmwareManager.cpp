@@ -28,7 +28,7 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 	// 객체들 초기화
 	camera = std::make_unique<Camera>();
 	accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
-	// speaker = std::make_unique<Speaker>();														 // Speaker 클래스 필요
+	speaker = std::make_unique<Speaker>();														// Speaker 클래스 필요
 	// sleepinessDetector = std::make_unique<SleepinessDetector>();	// SleepinessDetector 클래스 필요
 	eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
 	utils = std::make_unique<Utils>("./frames");
@@ -310,7 +310,7 @@ bool FirmwareManager::requestDiagnosis() {
 		std::cout << "SLEEPINESS DETECTED! Triggering alert..." << std::endl;
 
 		// 1. 경고음 출력
-		// TODO: speaker->triggerAlert();
+		speaker->triggerAlert();
 
 		// 2. 졸음 근거 영상 저장 폴더 생성
 		std::string sleepDir = utils->createSleepinessDir(timestamp);

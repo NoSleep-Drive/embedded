@@ -17,7 +17,7 @@
 #include "DBThreadMonitoring.h"
 #include "EyeClosureQueueManagement.h"
 // #include "SleepinessDetector.h"
-// #include "Speaker.h"
+#include "Speaker.h"
 #include "Utils.h"
 
 class FirmwareManager {
@@ -25,7 +25,7 @@ private:
 	// 장치 객체들
 	std::unique_ptr<Camera> camera;
 	std::unique_ptr<AccelerationSensor> accelerationSensor;
-	// std::unique_ptr<Speaker> speaker;
+	std::unique_ptr<Speaker> speaker;
 	// std::unique_ptr<SleepinessDetector> sleepinessDetector;
 	std::unique_ptr<EyeClosureQueueManagement> eyeClosureQueue;
 	std::unique_ptr<Utils> utils;
