@@ -15,9 +15,13 @@
 // NumPy 배열 초기화를 위한 헬퍼 함수
 bool initializePythonAndNumpy() {
 	Py_Initialize();
+	if (!Py_IsInitialized()) {
+		std::cerr << "Failed to initialize Python interpreter" << std::endl;
+		return false;
+	}
 
 	// NumPy 배열 초기화
-	import_array1(false);	 // 실패 시 false 반환
+	import_array();
 
 	PyRun_SimpleString(
 			"import sys; sys.path.append('.'); sys.path.append('..'); sys.path.append('../python')");

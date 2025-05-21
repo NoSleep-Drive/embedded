@@ -2,7 +2,7 @@
 
 #include "../include/Utils.h"
 
-int main() {
+int runUtilsTest() {
 	std::cout << "프로그램 시작..." << std::endl;
 
 	Utils test;

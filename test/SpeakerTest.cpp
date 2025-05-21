@@ -138,8 +138,3 @@ int runSpeakerTest(int argc, char* argv[]) {
 
 	return 0;
 }
-
-// int main(int argc, char* argv[]) {
-// 	runSpeakerTest(argc, argv);
-// 	return 0;
-// }
