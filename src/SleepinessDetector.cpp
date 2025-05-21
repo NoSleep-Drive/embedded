@@ -1,80 +1,149 @@
 #include "../include/SleepinessDetector.h"
-#include "../include/EyeClosureQueueManagement.h"
-#include <iostream>
-#include <ctime>
-#include <string>
-#include <cstdlib> 
-#include <opencv2/opencv.hpp>
+
 #include <cpr/cpr.h>
-#include <nlohmann/json.hpp>
+
+#include <cstdlib>
+#include <ctime>
 #include <filesystem>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include <opencv2/opencv.hpp>
+#include <string>
+
+#include "../include/EyeClosureQueueManagement.h"
 
 SleepinessDetector::SleepinessDetector() {
-    sleepImgPath = "./frames";
+	sleepImgPath = "./frames";
 }
 
 void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
-    // TODO: issue #22 AI Server 큐 저장 요청 로직과 merge 필요
+	static int frameIndex = 0;
+
+	// 이미지 데이터 인코딩
+	std::vector<uchar> buffer;
+	cv::imencode(".jpg", frame, buffer);
+
+	// base64로 이미지를 인코딩하여 전송 준비
+	std::string base64Image = cpr::util::Base64::Encode(std::string(buffer.begin(), buffer.end()));
+
+	const char* uidC = std::getenv("DEVICE_UID");
+	const char* ipC = std::getenv("AI_SERVER_IP");
+
+	if (!uidC || !ipC) {
+		std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
+		return;
+	}
+
+	std::string deviceUidEnv(uidC);
+	std::string serverIP(ipC);
+
+	// 요청 데이터 생성
+	nlohmann::json jsonData = {
+			{"deviceUid", deviceUidEnv}, {"frameIdx", frameIndex++}, {"driverFrame", base64Image}};
+
+	// 요청 URL 생성
+	std::string url = serverIP + "/api/save/frame";
+
+	// API 요청
+	cpr::Response r = cpr::Post(cpr::Url{url}, cpr::Header{{"Content-Type", "application/json"}},
+															cpr::Body{jsonData.dump()});
+
+	// 응답 처리
+	if (r.status_code == 200) {
+		try {
+			nlohmann::json response = nlohmann::json::parse(r.text);
+
+			if (response.contains("success") && response["success"] == true) {
+				std::cout << "프레임 #" << (frameIndex - 1) << " 전송 성공" << std::endl;
+			} else {
+				std::cerr << "프레임 전송 실패 - 응답: " << r.text << std::endl;
+			}
+		} catch (const std::exception& e) {
+			std::cerr << "응답 파싱 오류: " << e.what() << std::endl;
+		}
+	} else {
+		std::cerr << "프레임 전송 실패 - 상태 코드: " << r.status_code << std::endl;
+
+		try {
+			nlohmann::json response = nlohmann::json::parse(r.text);
+
+			if (response.contains("success") && response["success"] == false &&
+					response.contains("error")) {
+				auto& error = response["error"];
+				std::cerr << "오류 코드: " << error["code"] << std::endl;
+				std::cerr << "오류 메시지: " << error["message"] << std::endl;
+				std::cerr << "오류 메서드: " << error["method"] << std::endl;
+				std::cerr << "상세 메시지: " << error["detail_message"] << std::endl;
+			}
+		} catch (const std::exception& e) {
+			std::cerr << "오류 응답 파싱 실패: " << e.what() << std::endl;
+		}
+	}
 }
 
-bool SleepinessDetector::requestAIDetection(const std::string& uid, const std::string& requestTime) {
-    std::cout << "AI Server 진단 요청하는 파이 UID : " << uid << " 및 요청 시각 : " << requestTime << std::endl;
+bool SleepinessDetector::requestAIDetection(const std::string& uid,
+																						const std::string& requestTime) {
+	std::cout << "AI Server 진단 요청하는 파이 UID : " << uid << " 및 요청 시각 : " << requestTime
+						<< std::endl;
 
-    const char* uidC = std::getenv("DEVICE_UID");
-    const char* ipC = std::getenv("AI_SERVER_IP");
+	const char* uidC = std::getenv("DEVICE_UID");
+	const char* ipC = std::getenv("AI_SERVER_IP");
 
-    if (!uidC || !ipC) {
-        std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
-        return false;
-    }
+	if (!uidC || !ipC) {
+		std::cerr << "환경 변수 설정 오류: 통신에 필요한 정보 누락" << std::endl;
+		return false;
+	}
 
-    std::string deviceUidEnv(uidC);
-    std::string serverIP(ipC);
+	std::string deviceUidEnv(uidC);
+	std::string serverIP(ipC);
 
+	std::string url =
+			serverIP + "/diagnosis/drowiness?deviceUid=" + cpr::util::urlEncode(deviceUidEnv);
 
-    std::string url = serverIP + "/diagnosis/drowiness?deviceUid=" + cpr::util::urlEncode(deviceUidEnv);
+	cpr::Response r = cpr::Get(cpr::Url{url});
 
-    cpr::Response r = cpr::Get(cpr::Url{ url });
+	if (r.status_code != 200) {
+		std::cerr << "서버 응답 실패 - 상태 코드: " << r.status_code << "\n본문: " << r.text
+							<< std::endl;
+		return false;
+	}
 
-    if (r.status_code != 200) {
-        std::cerr << "서버 응답 실패 - 상태 코드: " << r.status_code << "\n본문: " << r.text << std::endl;
-        return false;
-    }
+	try {
+		nlohmann::json jsonResp = nlohmann::json::parse(r.text);
 
-    try {
-        nlohmann::json jsonResp = nlohmann::json::parse(r.text);
+		if (jsonResp.contains("success") && jsonResp["success"] == true) {
+			bool isDrowsy = jsonResp["isDrowsinessDrive"];
+			std::string detectionTime = jsonResp["detectionTime"];
 
-        if (jsonResp.contains("success") && jsonResp["success"] == true) {
-            bool isDrowsy = jsonResp["isDrowsinessDrive"];
-            std::string detectionTime = jsonResp["detectionTime"];
+			std::cout << "AI 진단 성공 - 졸음 운전 여부: " << (isDrowsy ? "예" : "아니오")
+								<< ", 감지 시각: " << detectionTime << std::endl;
 
-            std::cout << "AI 진단 성공 - 졸음 운전 여부: " << (isDrowsy ? "예" : "아니오")
-                << ", 감지 시각: " << detectionTime << std::endl;
-
-            return isDrowsy;
-        }
-        else {
-            const auto& err = jsonResp["error"];
-            std::cerr << "AI 서버 오류 - 코드: " << err["code"]
-                << ", 메시지: " << err["message"]
-                << ", 메서드: " << err["method"]
-                << ", 상세: " << err["detail_message"] << std::endl;
-            return false;
-        }
-    }
-    catch (const std::exception& e) {
-        std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
-        return false;
-    }
-
-    // TODO: 타임아웃 시 로컬 진단 getLocalDetection 필요
+			return isDrowsy;
+		} else {
+			const auto& err = jsonResp["error"];
+			std::cerr << "AI 서버 오류 - 코드: " << err["code"] << ", 메시지: " << err["message"]
+								<< ", 메서드: " << err["method"] << ", 상세: " << err["detail_message"]
+								<< std::endl;
+			return false;
+		}
+	} catch (const std::exception& e) {
+		std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
+		return false;
+	}
 }
 
 bool SleepinessDetector::getLocalDetection(EyeClosureQueueManagement& eyeManager) {
-    return eyeManager.detectSleepiness();
+	return eyeManager.detectSleepiness();
 }
 
 void SleepinessDetector::updateBaseSleepImgPath(const std::string& path) {
-    sleepImgPath = path;
-    // TODO
+	// 기본 저장 경로 업데이트
+	sleepImgPath = path;
+	std::cout << "졸음 이미지 기본 경로 업데이트됨: " << path << std::endl;
+
+	// 경로가 존재하지 않으면 생성
+	if (!std::filesystem::exists(sleepImgPath)) {
+		std::filesystem::create_directories(sleepImgPath);
+		std::cout << "졸음 이미지 기본 경로 생성됨: " << path << std::endl;
+	}
 }
