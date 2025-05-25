@@ -38,6 +38,8 @@ DBThread::DBThread(const std::string& uid, const std::string& folder, DBThreadMo
 	time = std::filesystem::last_write_time(folderPath);
 }
 
+DBThread::~DBThread() {}
+
 void DBThread::deleteFolderSafe(const std::string& path) {
 	try {
 		std::filesystem::remove_all(path);
