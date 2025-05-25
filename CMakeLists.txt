@@ -20,15 +20,84 @@ find_package(PythonLibs REQUIRED)
 # Python 헤더 파일 경로를 포함 경로에 추가
 include_directories(${PYTHON_INCLUDE_DIRS})
 
+# NumPy 헤더 경로를 Python으로 직접 찾기
+execute_process(
+    COMMAND python3 -c "import numpy; print(numpy.get_include())"
+    OUTPUT_VARIABLE NUMPY_INCLUDE_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if(NUMPY_INCLUDE_PATH)
+    include_directories(${NUMPY_INCLUDE_PATH})
+    message(STATUS "Found NumPy include path: ${NUMPY_INCLUDE_PATH}")
+else()
+    message(FATAL_ERROR "Could not find NumPy include path")
+endif()
+
 # nlohmann 헤더 파일 경로를 포함 경로에 추가
 include_directories(${PROJECT_SOURCE_DIR}/include) # include 디렉토리에 json.hpp 필요
 
+# CPR 라이브러리 찾기 (수동 설정)
+find_library(CPR_LIBRARY
+    NAMES cpr libcpr
+    PATHS /usr/local/lib /usr/lib
+    REQUIRED
+)
+
+find_path(CPR_INCLUDE_DIR
+    NAMES cpr/cpr.h
+    PATHS /usr/local/include /usr/include
+    REQUIRED
+)
+
+# OpenSSL 패키지 찾기 (CPR에서 필요)
+find_package(OpenSSL REQUIRED)
+
+if(CPR_LIBRARY AND CPR_INCLUDE_DIR)
+    message(STATUS "Found CPR library: ${CPR_LIBRARY}")
+    message(STATUS "Found CPR include: ${CPR_INCLUDE_DIR}")
+    include_directories(${CPR_INCLUDE_DIR})
+else()
+    message(FATAL_ERROR "Could not find CPR library")
+endif()
+
+# NumPy 헤더 경로를 Python으로 직접 찾기
+execute_process(
+    COMMAND python3 -c "import numpy; print(numpy.get_include())"
+    OUTPUT_VARIABLE NUMPY_INCLUDE_PATH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if(NUMPY_INCLUDE_PATH)
+    include_directories(${NUMPY_INCLUDE_PATH})
+    message(STATUS "Found NumPy include path: ${NUMPY_INCLUDE_PATH}")
+else()
+    message(FATAL_ERROR "Could not find NumPy include path")
+endif()
+
 # src 디렉토리의 모든 .cpp 파일을 자동으로 찾아 SOURCE_FILES 변수에 저장
-file(GLOB_RECURSE SOURCE_FILES src/*.cpp test/*.cpp)
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 
 # 실행 파일 생성 시 모든 소스 파일 사용
 add_executable(nosleep_drive ${SOURCE_FILES})
 
+# 컴파일러 정의 추가 (NumPy API 관련)
+target_compile_definitions(nosleep_drive PRIVATE 
+    NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
+)
+
 # 실행 파일과 외부 라이브러리를 연결
-# OpenCV와 Python 관련 라이브러리를 함께 링크함
-target_link_libraries(nosleep_drive ${OpenCV_LIBS} ${PYTHON_LIBRARIES})
+# OpenCV, Python, CPR, OpenSSL 관련 라이브러리를 함께 링크함
+target_link_libraries(nosleep_drive 
+    ${OpenCV_LIBS} 
+    ${PYTHON_LIBRARIES} 
+    ${CPR_LIBRARY}
+    ${OPENSSL_LIBRARIES}
+    ssl
+    crypto
+    curl
+    pthread
+)
+
+# 추가 컴파일 옵션
+target_compile_options(nosleep_drive PRIVATE -Wall -Wextra)

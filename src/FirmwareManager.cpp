@@ -13,7 +13,7 @@
 #include "../include/SleepinessDetector.h"
 
 // NumPy 배열 초기화를 위한 헬퍼 함수
-bool initializePythonAndNumpy() {
+bool FirmwareManager::initializePythonAndNumpy() {
 	Py_Initialize();
 	if (!Py_IsInitialized()) {
 		std::cerr << "Failed to initialize Python interpreter" << std::endl;
@@ -21,7 +21,7 @@ bool initializePythonAndNumpy() {
 	}
 
 	// NumPy 배열 초기화
-	import_array();
+	import_array1(false);
 
 	PyRun_SimpleString(
 			"import sys; sys.path.append('.'); sys.path.append('..'); sys.path.append('../python')");
@@ -285,11 +285,32 @@ bool FirmwareManager::processSingleFrame() {
 			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
 			if (pFunc != nullptr && PyCallable_Check(pFunc)) {
 				// cv::Mat을 NumPy 배열로 변환
-				npy_intp dims[3] = {preprocessedFrame.rows, preprocessedFrame.cols,
-														preprocessedFrame.channels()};
-				PyObject* pArray = PyArray_SimpleNewFromData(
-						preprocessedFrame.channels() == 1 ? 2 : 3, dims,
-						preprocessedFrame.depth() == CV_8U ? NPY_UINT8 : NPY_FLOAT32, preprocessedFrame.data);
+				npy_intp dims[3];
+				int nd;
+				int typenum;
+
+				if (preprocessedFrame.channels() == 1) {
+					// 그레이스케일 이미지
+					nd = 2;
+					dims[0] = preprocessedFrame.rows;
+					dims[1] = preprocessedFrame.cols;
+					typenum = NPY_UINT8;
+				} else {
+					// 컬러 이미지
+					nd = 3;
+					dims[0] = preprocessedFrame.rows;
+					dims[1] = preprocessedFrame.cols;
+					dims[2] = preprocessedFrame.channels();
+					typenum = NPY_UINT8;
+				}
+
+				PyObject* pArray = PyArray_SimpleNewFromData(nd, dims, typenum, preprocessedFrame.data);
+				if (pArray == nullptr) {
+					std::cerr << "Failed to create NumPy array" << std::endl;
+					Py_DECREF(pModule);
+					PyGILState_Release(gstate);
+					return false;
+				}
 
 				// 함수 인자 설정
 				float threshold = 0.25f;

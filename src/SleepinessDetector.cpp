@@ -5,12 +5,42 @@
 #include <cstdlib>
 #include <ctime>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <opencv2/opencv.hpp>
+#include <sstream>
 #include <string>
 
 #include "../include/EyeClosureQueueManagement.h"
+
+namespace {
+std::string base64_encode(const std::string& input) {
+	const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	std::string encoded;
+	int val = 0;
+	int valb = -6;
+
+	for (unsigned char c : input) {
+		val = (val << 8) + c;
+		valb += 8;
+		while (valb >= 0) {
+			encoded.push_back(chars[(val >> valb) & 0x3F]);
+			valb -= 6;
+		}
+	}
+
+	if (valb > -6) {
+		encoded.push_back(chars[((val << 8) >> (valb + 8)) & 0x3F]);
+	}
+
+	while (encoded.size() % 4) {
+		encoded.push_back('=');
+	}
+
+	return encoded;
+}
+}	 // namespace
 
 SleepinessDetector::SleepinessDetector() {
 	sleepImgPath = "./frames";
@@ -23,8 +53,7 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 	std::vector<uchar> buffer;
 	cv::imencode(".jpg", frame, buffer);
 
-	// base64로 이미지를 인코딩하여 전송 준비
-	std::string base64Image = cpr::util::Base64::Encode(std::string(buffer.begin(), buffer.end()));
+	std::string base64Image = base64_encode(std::string(buffer.begin(), buffer.end()));
 
 	const char* uidC = std::getenv("DEVICE_UID");
 	const char* ipC = std::getenv("AI_SERVER_IP");
@@ -97,8 +126,10 @@ bool SleepinessDetector::requestAIDetection(const std::string& uid,
 	std::string deviceUidEnv(uidC);
 	std::string serverIP(ipC);
 
-	std::string url =
-			serverIP + "/diagnosis/drowiness?deviceUid=" + cpr::util::urlEncode(deviceUidEnv);
+	auto encodedSecure = cpr::util::urlEncode(deviceUidEnv);
+	std::string encodedUid(encodedSecure.begin(), encodedSecure.end());
+
+	std::string url = serverIP + "/diagnosis/drowiness?deviceUid=" + encodedUid;
 
 	cpr::Response r = cpr::Get(cpr::Url{url});
 
