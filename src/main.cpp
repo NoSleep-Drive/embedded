@@ -5,6 +5,9 @@
 #include <string>
 #include <thread>
 
+// NumPy 중복 정의 방지
+#define NO_IMPORT_ARRAY
+
 #include "../include/FirmwareManager.h"
 #include "../include/Utils.h"
 

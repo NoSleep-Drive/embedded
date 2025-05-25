@@ -11,6 +11,7 @@
 // Python.h 및 NumPy 헤더 포함
 #include <Python.h>
 #define PY_ARRAY_UNIQUE_SYMBOL NOSLEEP_ARRAY_API
+#define NPY_NO_DEPRECATED_API	 NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 
 #include "AccelerationSensor.h"
@@ -53,6 +54,9 @@ private:
 	void initializeDevices();
 	void handleVehicleStopped();
 	void handleSleepinessDetected(const std::string& timestamp);
+
+	// NumPy 초기화 메서드
+	bool initializePythonAndNumpy();
 
 public:
 	FirmwareManager(const std::string& uid = "rasp-0001");
