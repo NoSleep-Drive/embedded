@@ -33,57 +33,69 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 		: deviceUID(uid), isRunning(false), isPaused(false), frameCycle(0), diagnosticCycle(0) {
 	std::cout << "NoSleep Drive 펌웨어 매니저 초기화 중 (ID: " << uid << ")..." << std::endl;
 
-	// 객체들 초기화
-	camera = std::make_unique<Camera>();
-	accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
-	speaker = std::make_unique<Speaker>();
-	sleepinessDetector = std::make_unique<SleepinessDetector>();
-	eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
-	utils = std::make_unique<Utils>("./frames");
-	threadMonitor = std::make_unique<DBThreadMonitoring>();
+	try {
+		// 환경 변수에 장치 UID 설정
+		setEnvVar("DEVICE_UID", deviceUID);
 
-	// 환경 변수에 장치 UID 설정
-	setEnvVar("DEVICE_UID", deviceUID);
-
-	// Python 및 NumPy 초기화
-	if (!initializePythonAndNumpy()) {
-		std::cerr << "Python/NumPy 초기화 실패" << std::endl;
-		throw std::runtime_error("Python/NumPy 초기화 실패");
-	}
-
-	// Python 모듈 로드 (눈 감음 감지 라이브러리)
-	PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
-	if (pModule == nullptr) {
-		PyErr_Print();
-		std::cerr << "Failed to import eye_detection_lib module" << std::endl;
-	} else {
-		// 초기화 함수 호출
-		PyObject* pFunc = PyObject_GetAttrString(pModule, "initialize");
-		if (pFunc != nullptr && PyCallable_Check(pFunc)) {
-			PyObject* pValue = PyObject_CallObject(pFunc, nullptr);
-			if (pValue != nullptr) {
-				bool result = PyObject_IsTrue(pValue);
-				if (result) {
-					std::cout << "Python eye detection initialized successfully" << std::endl;
-				} else {
-					std::cerr << "Python eye detection initialization failed" << std::endl;
-				}
-				Py_DECREF(pValue);
-			}
-			Py_DECREF(pFunc);
+		// Python 및 NumPy 초기화
+		std::cout << "Python 및 NumPy 초기화 중..." << std::endl;
+		if (!initializePythonAndNumpy()) {
+			std::cerr << "Python/NumPy 초기화 실패" << std::endl;
+			throw std::runtime_error("Python/NumPy 초기화 실패");
 		}
-		Py_DECREF(pModule);
-	}
 
-	// 스레드 모니터링 시작
-	threadMonitor->startDBMonitoring();
+		// Python 모듈 로드 (눈 감음 감지 라이브러리)
+		std::cout << "Python 모듈 로드 중..." << std::endl;
+		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
+		if (pModule == nullptr) {
+			PyErr_Print();
+			std::cerr << "Failed to import eye_detection_lib module" << std::endl;
+		} else {
+			// 초기화 함수 호출
+			PyObject* pFunc = PyObject_GetAttrString(pModule, "initialize");
+			if (pFunc != nullptr && PyCallable_Check(pFunc)) {
+				PyObject* pValue = PyObject_CallObject(pFunc, nullptr);
+				if (pValue != nullptr) {
+					bool result = PyObject_IsTrue(pValue);
+					if (result) {
+						std::cout << "Python eye detection initialized successfully" << std::endl;
+					} else {
+						std::cerr << "Python eye detection initialization failed" << std::endl;
+					}
+					Py_DECREF(pValue);
+				}
+				Py_DECREF(pFunc);
+			}
+			Py_DECREF(pModule);
+		}
+
+		// 객체들 초기화
+		std::cout << "컴포넌트 객체들 초기화 중..." << std::endl;
+		camera = std::make_unique<Camera>();
+		accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
+		speaker = std::make_unique<Speaker>();
+		sleepinessDetector = std::make_unique<SleepinessDetector>();
+		eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
+		utils = std::make_unique<Utils>("./frames");
+		threadMonitor = std::make_unique<DBThreadMonitoring>();
+
+		std::cout << "FirmwareManager initialized with device UID: " << deviceUID << std::endl;
+		std::cout << "NoSleep Drive 펌웨어 매니저 초기화 완료" << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "FirmwareManager 초기화 중 예외 발생: " << e.what() << std::endl;
+		throw;
+	}
 }
 
 FirmwareManager::~FirmwareManager() {
+	std::cout << "FirmwareManager 소멸자 시작" << std::endl;
 	stop();
 
 	// Python 종료
-	Py_Finalize();
+	if (Py_IsInitialized()) {
+		Py_Finalize();
+	}
 
 	std::cout << "FirmwareManager destroyed" << std::endl;
 }
@@ -124,16 +136,21 @@ void FirmwareManager::start() {
 		return;
 	}
 
-	// 장치 초기화
-	initializeDevices();
+	try {
+		// 장치 초기화
+		initializeDevices();
 
-	isRunning.store(true);
-	isPaused.store(false);
+		isRunning.store(true);
+		isPaused.store(false);
 
-	// 메인 루프 스레드 시작
-	mainThread = std::thread(&FirmwareManager::mainLoop, this);
+		// 메인 루프 스레드 시작
+		mainThread = std::thread(&FirmwareManager::mainLoop, this);
 
-	std::cout << "FirmwareManager started" << std::endl;
+		std::cout << "FirmwareManager started" << std::endl;
+	} catch (const std::exception& e) {
+		std::cerr << "FirmwareManager 시작 중 오류: " << e.what() << std::endl;
+		throw;
+	}
 }
 
 void FirmwareManager::stop() {
