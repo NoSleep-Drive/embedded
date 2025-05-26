@@ -15,6 +15,8 @@ Camera::~Camera() {
 }
 
 void Camera::initialize() {
+	std::cout << "카메라 초기화 중..." << std::endl;
+
 	// GStreamer 파이프라인 구성
 	gstreamerPipeline = "libcamerasrc camera-name=" + cameraName +
 											" ! video/x-raw,width=" + std::to_string(resolution[0]) +
@@ -78,7 +80,8 @@ void Camera::setCameraStatus(bool status) {
 }
 
 bool Camera::getCameraStatus() const {
-	return deviceStatus[0];
+	// 전역 상태 매니저에서 카메라 상태 조회
+	return DeviceStatusManager::getInstance().getDeviceStatus(0);
 }
 
 void Camera::setResolution(int width, int height) {

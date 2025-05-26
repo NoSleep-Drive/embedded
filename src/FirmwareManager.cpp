@@ -101,7 +101,7 @@ FirmwareManager::~FirmwareManager() {
 }
 
 void FirmwareManager::initializeDevices() {
-	std::cout << "Initializing devices..." << std::endl;
+	std::cout << "장치 초기화 시작..." << std::endl;
 
 	try {
 		// 장치 초기화
@@ -109,25 +109,30 @@ void FirmwareManager::initializeDevices() {
 		accelerationSensor->initialize();
 		speaker->initialize();
 
-		// 장치 상태 확인
-		if (!camera->getConnectionStatus()) {
-			std::cerr << "경고: 카메라가 제대로 초기화되지 않았습니다." << std::endl;
-		}
-
-		if (!accelerationSensor->getConnectionStatus()) {
-			std::cerr << "경고: 가속도 센서가 제대로 초기화되지 않았습니다." << std::endl;
-		}
-
-		if (!speaker->getConnectionStatus()) {
-			std::cerr << "경고: 스피커가 제대로 초기화되지 않았습니다." << std::endl;
-		}
+		// 모든 장치 초기화 완료 후 한 번에 백엔드로 상태 전송
+		sendDeviceStatusToBackend();
 
 	} catch (const std::exception& e) {
 		std::cerr << "장치 초기화 중 오류 발생: " << e.what() << std::endl;
+		sendDeviceStatusToBackend();
 		throw;
 	}
 
 	std::cout << "모든 장치 초기화 완료" << std::endl;
+}
+
+void FirmwareManager::sendDeviceStatusToBackend() {
+	std::cout << "=== 장치 상태 백엔드 전송 ===" << std::endl;
+
+	// 전역 장치 상태 매니저를 통해 백엔드로 상태 전송
+	DeviceStatusManager::getInstance().sendDeviceStatusToBackend();
+
+	// 장치 상태 로깅
+	auto deviceStatus = DeviceStatusManager::getInstance().getAllDeviceStatus();
+	std::cout << "현재 장치 상태:" << std::endl;
+	std::cout << "  - 카메라: " << (deviceStatus[0] ? "연결됨" : "연결 안됨") << std::endl;
+	std::cout << "  - 가속도 센서: " << (deviceStatus[1] ? "연결됨" : "연결 안됨") << std::endl;
+	std::cout << "  - 스피커: " << (deviceStatus[2] ? "연결됨" : "연결 안됨") << std::endl;
 }
 
 void FirmwareManager::start() {

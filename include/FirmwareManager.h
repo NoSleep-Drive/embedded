@@ -55,6 +55,9 @@ private:
 	void handleVehicleStopped();
 	void handleSleepinessDetected(const std::string& timestamp);
 
+	// 장치 상태 백엔드 전송
+	void sendDeviceStatusToBackend();
+
 	// NumPy 초기화 메서드
 	bool initializePythonAndNumpy();
 
