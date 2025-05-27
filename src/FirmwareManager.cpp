@@ -49,7 +49,6 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 	eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
 	utils = std::make_unique<Utils>("./frames");
 	threadMonitor = std::make_unique<DBThreadMonitoring>();
-
 	// 환경 변수에 장치 UID 설정
 	setEnvVar("DEVICE_UID", deviceUID);
 
@@ -76,6 +75,7 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 				} else {
 					std::cerr << "Python eye detection initialization failed" << std::endl;
 				}
+
 				Py_DECREF(pValue);
 			}
 			Py_DECREF(pFunc);
@@ -83,6 +83,8 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 		Py_DECREF(pModule);
 	}
 
+	PyEval_InitThreads();
+	PyEval_SaveThread();
 	// 스레드 모니터링 시작
 	threadMonitor->startDBMonitoring();
 }
@@ -131,7 +133,6 @@ void FirmwareManager::start() {
 		std::cout << "FirmwareManager is already running" << std::endl;
 		return;
 	}
-
 	// 장치 초기화
 	initializeDevices();
 
@@ -238,10 +239,10 @@ void FirmwareManager::handleVehicleStopped() {
 
 	// 백엔드에 전송해야하는 졸음 근거 영상이 남아 있는 경우
 	if (threadMonitor->getIsDBThreadRunning()) {
-		std::cout << "차량 정차 감지: 졸음 근거 영상 전송 중..." << std::endl;
+		std::cout << "vehicle stopped: sending sleepiness video..." << std::endl;
 		// 스레드가 이미 실행 중이므로 추가 작업 없음
 	} else {
-		std::cout << "차량 정차 감지: 실시간 영상 데이터 삭제" << std::endl;
+		std::cout << "vehicle stopped: online video data removing" << std::endl;
 		// 실시간 영상을 저장하는 폴더 내의 모든 이미지 데이터 삭제
 		utils->removeFolder("recent");
 	}
@@ -280,14 +281,16 @@ bool FirmwareManager::processSingleFrame() {
 		// 2.5 그레이스케일과 반전된 L 채널 합성
 		cv::addWeighted(gray, 0.75, invertedL, 0.25, 0, preprocessedFrame);
 	} catch (const cv::Exception& e) {
-		std::cerr << "OpenCV error during preprocessing: " << e.what() << std::endl;
+		std::cout << "OpenCV error during preprocessing: " << e.what() << std::endl;
 		return false;
 	}
 
 	// 3. 눈 감음 판단 (Python 함수 호출)
 	bool eyesClosed = false;
-	PyGILState_STATE gstate = PyGILState_Ensure();
+	PyGILState_STATE gstate;
 	try {
+		gstate = PyGILState_Ensure();
+
 		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
 		if (pModule != nullptr) {
 			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
@@ -390,16 +393,16 @@ bool FirmwareManager::requestDiagnosis() {
 		// AI 서버 응답에 따라 졸음 판단
 		if (aiResponse) {
 			isSleepy = true;	// AI가 졸음으로 판단한 경우
-			std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
+			std::cout << "AI server answered that it's sleepiness." << std::endl;
 		}
 	} catch (const std::exception& e) {
-		std::cerr << "AI 서버 진단 요청 중 오류: " << e.what() << std::endl;
+		std::cerr << "error during AI server diagnosis request: " << e.what() << std::endl;
 		// 예외 발생 시 aiResponse = false 유지
 	}
 
 	// 3. AI 서버 응답이 없거나 통신 실패 시 로컬 알고리즘 사용
 	if (!aiResponse) {
-		std::cout << "AI 서버 응답 없음, 로컬 알고리즘으로 진단합니다." << std::endl;
+		std::cout << "AI server doesn't answer, get diagnosis by local algorithm." << std::endl;
 		// 로컬 눈 감음 데이터 기반 졸음 여부 판단
 		isSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
 	}
@@ -413,14 +416,14 @@ bool FirmwareManager::requestDiagnosis() {
 }
 
 void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
-	std::cout << "***** 졸음 감지! 알람 작동 *****" << std::endl;
+	std::cout << "***** sleepiness detection! alert! *****" << std::endl;
 
 	// 1. 경고음 출력
 	speaker->triggerAlert();
 
 	// 2. 졸음 근거 영상 저장 폴더 생성
 	std::string sleepDir = utils->createSleepinessDir(timestamp);
-	std::cout << "졸음 영상 저장 경로: " << sleepDir << std::endl;
+	std::cout << "sleepiness video path: " << sleepDir << std::endl;
 
 	// 3. 현재까지의 프레임 저장
 	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder();

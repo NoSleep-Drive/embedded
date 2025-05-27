@@ -74,11 +74,15 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 	std::string url = serverIP + "/api/save/frame";
 
 	// API 요청
-	cpr::Response r = cpr::Post(cpr::Url{url}, cpr::Header{{"Content-Type", "application/json"}},
-															cpr::Body{jsonData.dump()});
+	std::thread([](std::string url, std::string data) {
+		cpr::Post(cpr::Url{ url },
+		cpr::Header{ {"Content-Type", "application/json"} },
+		cpr::Body{ data });
+		}, url, jsonData.dump()).detach();
+
 
 	// 응답 처리
-	if (r.status_code == 200) {
+	/*if (r.status_code == 200) {
 		try {
 			nlohmann::json response = nlohmann::json::parse(r.text);
 
@@ -107,7 +111,7 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 		} catch (const std::exception& e) {
 			std::cerr << "오류 응답 파싱 실패: " << e.what() << std::endl;
 		}
-	}
+	}*/
 }
 
 bool SleepinessDetector::requestAIDetection(const std::string& uid,

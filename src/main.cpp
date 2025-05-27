@@ -15,7 +15,7 @@ std::atomic<bool> running(true);
 
 // SIGINT(Ctrl+C) 및 SIGTERM 핸들러
 void signalHandler(int signum) {
-	std::cout << "인터럽트 시그널 (" << signum << ") 수신. 종료 중..." << std::endl;
+	std::cout << "interrupt signal (" << signum << ") received. terminating..." << std::endl;
 	running = false;
 }
 
