@@ -14,6 +14,13 @@
 
 // NumPy 배열 초기화를 위한 헬퍼 함수
 bool FirmwareManager::initializePythonAndNumpy() {
+
+	wchar_t* pythonHome = Py_DecodeLocale("C:/Users/twin4/AppData/Local/Programs/Python/Python313", nullptr);
+	Py_SetPythonHome(pythonHome);
+
+	wchar_t* programName = Py_DecodeLocale("C:/Users/twin4/AppData/Local/Programs/Python/Python313/python.exe", nullptr);
+	Py_SetProgramName(programName);
+
 	Py_Initialize();
 	if (!Py_IsInitialized()) {
 		std::cerr << "Failed to initialize Python interpreter" << std::endl;
@@ -24,7 +31,8 @@ bool FirmwareManager::initializePythonAndNumpy() {
 	import_array1(false);
 
 	PyRun_SimpleString(
-			"import sys; sys.path.append('.'); sys.path.append('..'); sys.path.append('../python')");
+			"import sys; sys.path.append('C:/github/NoSleepDrive/embedded/python');  sys.path.append('C:/Users/twin4/AppData/Local/Programs/Python/Python313/Lib/site-packages');");
+
 
 	return true;
 }
