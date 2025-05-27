@@ -146,19 +146,19 @@ bool SleepinessDetector::requestAIDetection(const std::string& uid,
 			bool isDrowsy = jsonResp["isDrowsinessDrive"];
 			std::string detectionTime = jsonResp["detectionTime"];
 
-			std::cout << "AI 진단 성공 - 졸음 운전 여부: " << (isDrowsy ? "예" : "아니오")
-								<< ", 감지 시각: " << detectionTime << std::endl;
+			//std::cout << "AI 진단 성공 - 졸음 운전 여부: " << (isDrowsy ? "예" : "아니오")
+			//					<< ", 감지 시각: " << detectionTime << std::endl;
 
 			return isDrowsy;
 		} else {
 			const auto& err = jsonResp["error"];
-			std::cerr << "AI 서버 오류 - 코드: " << err["code"] << ", 메시지: " << err["message"]
-								<< ", 메서드: " << err["method"] << ", 상세: " << err["detail_message"]
-								<< std::endl;
+			//std::cerr << "AI 서버 오류 - 코드: " << err["code"] << ", 메시지: " << err["message"]
+			//					<< ", 메서드: " << err["method"] << ", 상세: " << err["detail_message"]
+			//					<< std::endl;
 			return false;
 		}
 	} catch (const std::exception& e) {
-		std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
+		//std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
 		return false;
 	}
 }

@@ -1,103 +1,60 @@
-# CMake 최소 버전 요구. 3.10 이상이어야 이 설정을 인식할 수 있음.
 cmake_minimum_required(VERSION 3.10)
+cmake_policy(SET CMP0148 NEW)
+set(CMAKE_TOOLCHAIN_FILE "C:/Users/twin4/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+set(CMAKE_PREFIX_PATH "C:/Users/twin4/vcpkg/installed/x64-windows/share" ${CMAKE_PREFIX_PATH})
 
-# 프로젝트 이름을 설정. 이후 변수 ${PROJECT_NAME}으로도 사용 가능.
+
 project(NoSleepDrive)
 
-# 사용할 C++ 표준 설정 (C++17 사용)
 set(CMAKE_CXX_STANDARD 17)
 
-# OpenCV 패키지를 찾음. 시스템에 설치된 OpenCV를 탐색함.
-# REQUIRED 옵션은 못 찾으면 오류 발생시킴.
+# OpenCV
 find_package(OpenCV REQUIRED)
-
-# OpenCV 헤더 파일 경로를 포함 경로에 추가
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-# Python 라이브러리 찾기 (Python 해더 및 링크 라이브러리)
-find_package(PythonLibs REQUIRED)
+# Python3 + NumPy (CMake 3.12 이상부터 지원, CMake 3.28 호환됨)
+find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
+include_directories(${Python3_INCLUDE_DIRS} ${Python3_NumPy_INCLUDE_DIRS})
 
-# Python 헤더 파일 경로를 포함 경로에 추가
-include_directories(${PYTHON_INCLUDE_DIRS})
+# NumPy 경로 메시지 출력 (선택 사항)
+message(STATUS "Found Python3 include path: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Found NumPy include path: ${Python3_NumPy_INCLUDE_DIRS}")
 
-# NumPy 헤더 경로를 Python으로 직접 찾기
-execute_process(
-    COMMAND python3 -c "import numpy; print(numpy.get_include())"
-    OUTPUT_VARIABLE NUMPY_INCLUDE_PATH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+# nlohmann json header
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
-if(NUMPY_INCLUDE_PATH)
-    include_directories(${NUMPY_INCLUDE_PATH})
-    message(STATUS "Found NumPy include path: ${NUMPY_INCLUDE_PATH}")
-else()
-    message(FATAL_ERROR "Could not find NumPy include path")
-endif()
+find_package(cpr CONFIG REQUIRED)
 
-# nlohmann 헤더 파일 경로를 포함 경로에 추가
-include_directories(${PROJECT_SOURCE_DIR}/include) # include 디렉토리에 json.hpp 필요
+find_package(ZLIB REQUIRED)
+include_directories(${ZLIB_INCLUDE_DIRS})
 
-# CPR 라이브러리 찾기 (수동 설정)
-find_library(CPR_LIBRARY
-    NAMES cpr libcpr
-    PATHS /usr/local/lib /usr/lib
-    REQUIRED
-)
 
-find_path(CPR_INCLUDE_DIR
-    NAMES cpr/cpr.h
-    PATHS /usr/local/include /usr/include
-    REQUIRED
-)
-
-# OpenSSL 패키지 찾기 (CPR에서 필요)
+# OpenSSL
 find_package(OpenSSL REQUIRED)
 
-if(CPR_LIBRARY AND CPR_INCLUDE_DIR)
-    message(STATUS "Found CPR library: ${CPR_LIBRARY}")
-    message(STATUS "Found CPR include: ${CPR_INCLUDE_DIR}")
-    include_directories(${CPR_INCLUDE_DIR})
-else()
-    message(FATAL_ERROR "Could not find CPR library")
-endif()
-
-# NumPy 헤더 경로를 Python으로 직접 찾기
-execute_process(
-    COMMAND python3 -c "import numpy; print(numpy.get_include())"
-    OUTPUT_VARIABLE NUMPY_INCLUDE_PATH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-if(NUMPY_INCLUDE_PATH)
-    include_directories(${NUMPY_INCLUDE_PATH})
-    message(STATUS "Found NumPy include path: ${NUMPY_INCLUDE_PATH}")
-else()
-    message(FATAL_ERROR "Could not find NumPy include path")
-endif()
-
-# src 디렉토리의 모든 .cpp 파일을 자동으로 찾아 SOURCE_FILES 변수에 저장
+# 소스 파일 수집
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 
-# 실행 파일 생성 시 모든 소스 파일 사용
+# 실행 파일 생성
 add_executable(nosleep_drive ${SOURCE_FILES})
 
-# 컴파일러 정의 추가 (NumPy API 관련)
+# NumPy 매크로 정의
 target_compile_definitions(nosleep_drive PRIVATE 
     NPY_NO_DEPRECATED_API=NPY_1_7_API_VERSION
 )
 
-# 실행 파일과 외부 라이브러리를 연결
-# OpenCV, Python, CPR, OpenSSL 관련 라이브러리를 함께 링크함
+# 외부 라이브러리 링크
 target_link_libraries(nosleep_drive 
-    ${OpenCV_LIBS} 
-    ${PYTHON_LIBRARIES} 
-    ${CPR_LIBRARY}
+    ${OpenCV_LIBS}
+    ${Python3_LIBRARIES}
+    cpr::cpr
     ${OPENSSL_LIBRARIES}
-    ssl
-    crypto
-    curl
-    pthread
+    ${ZLIB_LIBRARIES}
 )
 
-# 추가 컴파일 옵션
-target_compile_options(nosleep_drive PRIVATE -Wall -Wextra)
+# 컴파일 옵션
+if (MSVC)
+    target_compile_options(nosleep_drive PRIVATE /W4)
+else()
+    target_compile_options(nosleep_drive PRIVATE -Wall -Wextra -Werror)
+endif() 

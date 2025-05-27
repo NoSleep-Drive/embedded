@@ -10,7 +10,7 @@
 
 std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     // example path(folderPath): ./frames/20250519_023859
-    std::cout << "파일 경로 " << path << " 생성 시간 기준 전후 각각 2.5초 이미지 프레임들을 영상으로 변환" << std::endl;
+    //std::cout << "파일 경로 " << path << " 생성 시간 기준 전후 각각 2.5초 이미지 프레임들을 영상으로 변환" << std::endl;
     std::vector<cv::String> framePaths;
     std::vector<uchar> videoBuffer;
 
@@ -20,7 +20,7 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     ss >> std::get_time(&folderTime, "%Y%m%d_%H%M%S");
 
     if (ss.fail()) {
-        std::cerr << "폴더 이름에서 타임스탬프를 파싱할 수 없음: " << folderName << std::endl;
+        //std::cerr << "폴더 이름에서 타임스탬프를 파싱할 수 없음: " << folderName << std::endl;
         return videoBuffer;
     }
 

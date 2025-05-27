@@ -43,19 +43,19 @@ DBThread::~DBThread() {}
 void DBThread::deleteFolderSafe(const std::string& path) {
 	try {
 		std::filesystem::remove_all(path);
-		std::cout << "[DBThread] 폴더 삭제 성공: " << path << std::endl;
+		//std::cout << "[DBThread] 폴더 삭제 성공: " << path << std::endl;
 	} catch (const std::filesystem::filesystem_error& e) {
-		std::cerr << "[DBThread] 폴더 삭제 실패: " << e.what() << std::endl;
+		//std::cerr << "[DBThread] 폴더 삭제 실패: " << e.what() << std::endl;
 	}
 }
 
 bool DBThread::sendDataToDB() {
 	VideoEncoder encoder;
-	std::cout << "백서버 통신 전 이미지 데이터들을 영상 데이터로 변환" << std::endl;
+	//std::cout << "백서버 통신 전 이미지 데이터들을 영상 데이터로 변환" << std::endl;
 
 	std::vector<uchar> videoData = encoder.convertFramesToMP4(folderPath);
 	if (videoData.empty()) {
-		std::cerr << "영상 생성 실패로 영상 전송 통신 취소." << std::endl;
+		//std::cerr << "영상 생성 실패로 영상 전송 통신 취소." << std::endl;
 		setIsDBThreadRunningFalse();
 		return false;
 	}
@@ -63,12 +63,12 @@ bool DBThread::sendDataToDB() {
 	bool success = sendVideoToBackend(videoData);
 
 	if (success) {
-		std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
+		//std::cout << "백엔드 영상 저장 성공, 로컬 폴더 삭제 : " << folderPath << std::endl;
 		deleteFolderSafe(folderPath);
 		setIsDBThreadRunningFalse();
 		return true;
 	} else {
-		std::cerr << "백엔드 전송 실패, 로컬 폴더 삭제 : " << folderPath << std::endl;
+		//std::cerr << "백엔드 전송 실패, 로컬 폴더 삭제 : " << folderPath << std::endl;
 		deleteFolderSafe(folderPath);
 		setIsDBThreadRunningFalse();
 		return false;
