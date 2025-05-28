@@ -374,7 +374,11 @@ bool FirmwareManager::processSingleFrame() {
 	std::string timestamp = ss.str();
 
 	// 프레임 저장
-	utils->saveFrameToCurrentFrameFolder(resizedFrame, timestamp + ".jpg");
+	bool result = utils->saveFrameToCurrentFrameFolder(resizedFrame, timestamp + ".jpg");
+	if (!result) {
+		std::cerr << "Error saving frame to current folder" << std::endl;
+		return false;
+	}
 
 	if (utils->IsSavingSleepinessEvidence) {
 		// 졸음 근거 영상 저장
@@ -441,10 +445,10 @@ void FirmwareManager::requestDiagnosis() {
 
 						// 스택에 저장된 졸음 근거 영상 폴더를 전부 DB 전송 스레드에 추가
 						while (!sleepImgPathStack.empty()) {
-							std::string sleepDir = sleepImgPathStack.top();
+							std::string sleepDir = utils->saveDirectory + sleepImgPathStack.top();
 							sleepImgPathStack.pop();
 
-							auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor);
+							auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
 							threadMonitor->addDBThread(dbThread);
 						}
 						threadMonitor->setIsDBThreadRunning(true);

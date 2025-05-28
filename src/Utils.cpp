@@ -40,11 +40,11 @@ bool Utils::saveFrame(const cv::Mat& frame, const std::string& path, const std::
 }
 
 bool Utils::saveFrameToCurrentFrameFolder(const cv::Mat& frame, const std::string& name) {
-	if (sleepFolder.size() == 0) return false;
 	return saveFrame(frame, saveDirectory + recentFolder, name);
 }
 
 bool Utils::saveFrameToSleepinessFolder(const cv::Mat& frame, const std::string& name) {
+	if (sleepFolder.size() == 0) return false;
 	return saveFrame(frame, saveDirectory + sleepFolder, name);
 }
 
@@ -63,7 +63,7 @@ bool Utils::removeFolder(const std::string& folderName) {
 std::vector<cv::Mat> Utils::loadFramesFromFolder(const std::string& folderName) {
 	std::vector<cv::Mat> frames;
 	std::vector<std::filesystem::directory_entry> entries;
-	std::string fullPath = saveDirectory + folderName;
+	std::string fullPath = saveDirectory + "/" + folderName;
 	if (!std::filesystem::exists(fullPath)) {
 		std::cerr << "Directory does not exist: " << fullPath << std::endl;
 		return frames;	// Return empty vector if directory does not exist
