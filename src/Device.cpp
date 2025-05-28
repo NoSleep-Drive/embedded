@@ -76,10 +76,13 @@ void DeviceStatusManager::sendDeviceStatusToBackend() {
 						<< std::endl;
 
 	try {
-		cpr::Response r =
-				cpr::Patch(cpr::Url{serverIP + "/vehicles/status"}, headers, cpr::Body{jsonBody});
+		cpr::Response r = cpr::Patch(cpr::Url{serverIP + "/vehicles/status"}, headers,
+																 cpr::Body{jsonBody}, cpr::Timeout{5000}	// 5초 타임아웃
+		);
 
-		if (r.status_code == 200) {
+		if (r.error) {
+			std::cerr << "장치 상태 전송 오류: " << r.error.message << std::endl;
+		} else if (r.status_code == 200) {
 			std::cout << "장치 상태 전송 성공" << std::endl;
 		} else {
 			std::cerr << "장치 상태 전송 실패 - 상태 코드: " << r.status_code << ", 응답: " << r.text
