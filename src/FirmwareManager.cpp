@@ -33,63 +33,78 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 		: deviceUID(uid), isRunning(false), isPaused(false), frameCycle(0), diagnosticCycle(0) {
 	std::cout << "NoSleep Drive 펌웨어 매니저 초기화 중 (ID: " << uid << ")..." << std::endl;
 
-	// 객체들 초기화
-	camera = std::make_unique<Camera>();
-	accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
-	speaker = std::make_unique<Speaker>();
-	sleepinessDetector = std::make_unique<SleepinessDetector>();
-	eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
-	utils = std::make_unique<Utils>("./frames");
-	threadMonitor = std::make_unique<DBThreadMonitoring>();
+	try {
+		// 환경 변수에 장치 UID 설정
+		setEnvVar("DEVICE_UID", deviceUID);
 
-	// 환경 변수에 장치 UID 설정
-	setEnvVar("DEVICE_UID", deviceUID);
-
-	// Python 및 NumPy 초기화
-	if (!initializePythonAndNumpy()) {
-		std::cerr << "Python/NumPy 초기화 실패" << std::endl;
-		throw std::runtime_error("Python/NumPy 초기화 실패");
-	}
-
-	// Python 모듈 로드 (눈 감음 감지 라이브러리)
-	PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
-	if (pModule == nullptr) {
-		PyErr_Print();
-		std::cerr << "Failed to import eye_detection_lib module" << std::endl;
-	} else {
-		// 초기화 함수 호출
-		PyObject* pFunc = PyObject_GetAttrString(pModule, "initialize");
-		if (pFunc != nullptr && PyCallable_Check(pFunc)) {
-			PyObject* pValue = PyObject_CallObject(pFunc, nullptr);
-			if (pValue != nullptr) {
-				bool result = PyObject_IsTrue(pValue);
-				if (result) {
-					std::cout << "Python eye detection initialized successfully" << std::endl;
-				} else {
-					std::cerr << "Python eye detection initialization failed" << std::endl;
-				}
-				Py_DECREF(pValue);
-			}
-			Py_DECREF(pFunc);
+		// Python 및 NumPy 초기화
+		std::cout << "Python 및 NumPy 초기화 중..." << std::endl;
+		if (!initializePythonAndNumpy()) {
+			std::cerr << "Python/NumPy 초기화 실패" << std::endl;
+			throw std::runtime_error("Python/NumPy 초기화 실패");
 		}
-		Py_DECREF(pModule);
-	}
 
-	// 스레드 모니터링 시작
-	threadMonitor->startDBMonitoring();
+		// Python 모듈 로드 (눈 감음 감지 라이브러리)
+		std::cout << "Python 모듈 로드 중..." << std::endl;
+		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
+		if (pModule == nullptr) {
+			PyErr_Print();
+			std::cerr << "Failed to import eye_detection_lib module" << std::endl;
+		} else {
+			// 초기화 함수 호출
+			PyObject* pFunc = PyObject_GetAttrString(pModule, "initialize");
+			if (pFunc != nullptr && PyCallable_Check(pFunc)) {
+				PyObject* pValue = PyObject_CallObject(pFunc, nullptr);
+				if (pValue != nullptr) {
+					bool result = PyObject_IsTrue(pValue);
+					if (result) {
+						std::cout << "Python eye detection initialized successfully" << std::endl;
+					} else {
+						std::cerr << "Python eye detection initialization failed" << std::endl;
+					}
+					Py_DECREF(pValue);
+				}
+				Py_DECREF(pFunc);
+			}
+			Py_DECREF(pModule);
+		}
+
+		PyEval_InitThreads();
+		PyEval_SaveThread();
+
+		// 객체들 초기화
+		std::cout << "컴포넌트 객체들 초기화 중..." << std::endl;
+		camera = std::make_unique<Camera>();
+		accelerationSensor = std::make_unique<AccelerationSensor>(true);	// 목업 센서 사용
+		speaker = std::make_unique<Speaker>();
+		sleepinessDetector = std::make_unique<SleepinessDetector>();
+		eyeClosureQueue = std::make_unique<EyeClosureQueueManagement>();
+		utils = std::make_unique<Utils>("./frames");
+		threadMonitor = std::make_unique<DBThreadMonitoring>();
+
+		std::cout << "FirmwareManager initialized with device UID: " << deviceUID << std::endl;
+		std::cout << "NoSleep Drive 펌웨어 매니저 초기화 완료" << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "FirmwareManager 초기화 중 예외 발생: " << e.what() << std::endl;
+		throw;
+	}
 }
 
 FirmwareManager::~FirmwareManager() {
+	std::cout << "FirmwareManager 소멸자 시작" << std::endl;
 	stop();
 
 	// Python 종료
-	Py_Finalize();
+	if (Py_IsInitialized()) {
+		Py_Finalize();
+	}
 
 	std::cout << "FirmwareManager destroyed" << std::endl;
 }
 
 void FirmwareManager::initializeDevices() {
-	std::cout << "Initializing devices..." << std::endl;
+	std::cout << "장치 초기화 시작..." << std::endl;
 
 	try {
 		// 장치 초기화
@@ -97,25 +112,30 @@ void FirmwareManager::initializeDevices() {
 		accelerationSensor->initialize();
 		speaker->initialize();
 
-		// 장치 상태 확인
-		if (!camera->getConnectionStatus()) {
-			std::cerr << "경고: 카메라가 제대로 초기화되지 않았습니다." << std::endl;
-		}
-
-		if (!accelerationSensor->getConnectionStatus()) {
-			std::cerr << "경고: 가속도 센서가 제대로 초기화되지 않았습니다." << std::endl;
-		}
-
-		if (!speaker->getConnectionStatus()) {
-			std::cerr << "경고: 스피커가 제대로 초기화되지 않았습니다." << std::endl;
-		}
+		// 모든 장치 초기화 완료 후 한 번에 백엔드로 상태 전송
+		sendDeviceStatusToBackend();
 
 	} catch (const std::exception& e) {
 		std::cerr << "장치 초기화 중 오류 발생: " << e.what() << std::endl;
+		sendDeviceStatusToBackend();
 		throw;
 	}
 
 	std::cout << "모든 장치 초기화 완료" << std::endl;
+}
+
+void FirmwareManager::sendDeviceStatusToBackend() {
+	std::cout << "=== 장치 상태 백엔드 전송 ===" << std::endl;
+
+	// 전역 장치 상태 매니저를 통해 백엔드로 상태 전송
+	DeviceStatusManager::getInstance().sendDeviceStatusToBackend();
+
+	// 장치 상태 로깅
+	auto deviceStatus = DeviceStatusManager::getInstance().getAllDeviceStatus();
+	std::cout << "현재 장치 상태:" << std::endl;
+	std::cout << "  - 카메라: " << (deviceStatus[0] ? "연결됨" : "연결 안됨") << std::endl;
+	std::cout << "  - 가속도 센서: " << (deviceStatus[1] ? "연결됨" : "연결 안됨") << std::endl;
+	std::cout << "  - 스피커: " << (deviceStatus[2] ? "연결됨" : "연결 안됨") << std::endl;
 }
 
 void FirmwareManager::start() {
@@ -124,16 +144,21 @@ void FirmwareManager::start() {
 		return;
 	}
 
-	// 장치 초기화
-	initializeDevices();
+	try {
+		// 장치 초기화
+		initializeDevices();
 
-	isRunning.store(true);
-	isPaused.store(false);
+		isRunning.store(true);
+		isPaused.store(false);
 
-	// 메인 루프 스레드 시작
-	mainThread = std::thread(&FirmwareManager::mainLoop, this);
+		// 메인 루프 스레드 시작
+		mainThread = std::thread(&FirmwareManager::mainLoop, this);
 
-	std::cout << "FirmwareManager started" << std::endl;
+		std::cout << "FirmwareManager started" << std::endl;
+	} catch (const std::exception& e) {
+		std::cerr << "FirmwareManager 시작 중 오류: " << e.what() << std::endl;
+		throw;
+	}
 }
 
 void FirmwareManager::stop() {
@@ -278,8 +303,9 @@ bool FirmwareManager::processSingleFrame() {
 
 	// 3. 눈 감음 판단 (Python 함수 호출)
 	bool eyesClosed = false;
-	PyGILState_STATE gstate = PyGILState_Ensure();
+	PyGILState_STATE gstate;
 	try {
+		gstate = PyGILState_Ensure();	 // GIL 획득
 		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
 		if (pModule != nullptr) {
 			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
@@ -337,6 +363,8 @@ bool FirmwareManager::processSingleFrame() {
 	}
 	PyGILState_Release(gstate);
 
+	std::cout << "눈 감음 상태: " << (eyesClosed ? "감김" : "열림") << std::endl;
+
 	// 4. 눈 감음 상태 저장
 	eyeClosureQueue->saveEyeClosureStatus(eyesClosed);
 
@@ -362,46 +390,42 @@ bool FirmwareManager::processSingleFrame() {
 	return true;
 }
 
-bool FirmwareManager::requestDiagnosis() {
+void FirmwareManager::requestDiagnosis() {
 	std::cout << "Requesting sleepiness diagnosis (cycle " << diagnosticCycle << ")" << std::endl;
 
-	bool isSleepy = false;
-
-	// 1. 타임스탬프 생성
 	auto now = std::chrono::system_clock::now();
 	auto now_time_t = std::chrono::system_clock::to_time_t(now);
 	std::stringstream ss;
 	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
 	std::string timestamp = ss.str();
 
-	// 2. AI 서버에 진단 요청
-	bool aiResponse = false;
-	try {
-		aiResponse = sleepinessDetector->requestAIDetection(deviceUID, timestamp);
+	// 별도 스레드에서 비동기 호출
+	std::thread([this, timestamp]() {
+		sleepinessDetector->requestAIDetection(
+				deviceUID, timestamp,
+				[this, timestamp](bool success, bool isDrowsy, const std::string& message) {
+					bool finalSleepy = false;
 
-		// AI 서버 응답에 따라 졸음 판단
-		if (aiResponse) {
-			isSleepy = true;	// AI가 졸음으로 판단한 경우
-			std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
-		}
-	} catch (const std::exception& e) {
-		std::cerr << "AI 서버 진단 요청 중 오류: " << e.what() << std::endl;
-		// 예외 발생 시 aiResponse = false 유지
-	}
+					if (success) {
+						if (isDrowsy) {
+							std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
+							finalSleepy = true;
+						} else {
+							std::cout << "AI 서버 진단 결과: 졸음 아님 (" << message << ")" << std::endl;
+						}
+					} else {
+						std::cerr << "AI 서버 진단 실패: " << message << std::endl;
+						std::cout << "로컬 알고리즘으로 진단을 실시합니다." << std::endl;
+						std::lock_guard<std::mutex> lock(detectionMutex);
+						finalSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
+					}
 
-	// 3. AI 서버 응답이 없거나 통신 실패 시 로컬 알고리즘 사용
-	if (!aiResponse) {
-		std::cout << "AI 서버 응답 없음, 로컬 알고리즘으로 진단합니다." << std::endl;
-		// 로컬 눈 감음 데이터 기반 졸음 여부 판단
-		isSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
-	}
-
-	// 4. 졸음으로 판단된 경우 처리
-	if (isSleepy) {
-		handleSleepinessDetected(timestamp);
-	}
-
-	return true;
+					if (finalSleepy) {
+						std::lock_guard<std::mutex> lock(detectionMutex);
+						handleSleepinessDetected(timestamp);
+					}
+				});
+	}).detach();
 }
 
 void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {

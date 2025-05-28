@@ -27,7 +27,7 @@ def initialize():
     global predictor
     try:
         # Load face landmark model
-        predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+        predictor = dlib.shape_predictor("../shape_predictor_68_face_landmarks.dat")
         return True
     except Exception as e:
         print(f"[ERROR] Error during initialization: {e}")

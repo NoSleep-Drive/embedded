@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
 	// 환경 변수 설정 로드
 	Utils envLoader;
-	envLoader.loadEnvFile(".env");
+	envLoader.loadEnvFile("../.env");
 
 	// 장치 ID 설정 (환경 변수 또는 기본값)
 	std::string deviceUID = "rasp-0001";

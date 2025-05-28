@@ -147,7 +147,7 @@ MockAccelerationSensor::MockAccelerationSensor()
 		: xAcceleration(0.0f),
 			yAcceleration(0.0f),
 			zAcceleration(9.8f),
-			moving(false),
+			moving(true),
 			rng(std::chrono::system_clock::now().time_since_epoch().count()),
 			dist(-0.2f, 0.2f) {}
 
@@ -193,6 +193,8 @@ AccelerationSensor::AccelerationSensor(bool useMock) : Device(), useMock(useMock
 AccelerationSensor::~AccelerationSensor() {}
 
 void AccelerationSensor::initialize() {
+	std::cout << "가속도 센서 초기화 중..." << std::endl;
+
 	// Try to get acceleration data to check if sensor is working
 	std::vector<float> accel = sensor->getAcceleration();
 
@@ -202,8 +204,7 @@ void AccelerationSensor::initialize() {
 	setConnectionStatus(sensorWorking);
 	updateDeviceStatus(1, sensorWorking);	 // Accelerometer is index 1
 
-	// Send updated status to backend
-	sendDeviceStatus();
+	std::cout << "가속도 센서 초기화 " << (sensorWorking ? "성공" : "실패") << std::endl;
 }
 
 bool AccelerationSensor::isMoving() {

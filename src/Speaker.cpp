@@ -11,6 +11,8 @@ Speaker::Speaker(const std::string& soundFilePath, int vol)
 Speaker::~Speaker() {}
 
 void Speaker::initialize() {
+	std::cout << "스피커 초기화 중..." << std::endl;
+
 	// VLC 플레이어 설치 확인
 	int result = system("which cvlc > /dev/null 2>&1");
 
@@ -30,8 +32,6 @@ void Speaker::initialize() {
 		updateDeviceStatus(2, true);	// 스피커는 인덱스 2
 		std::cout << "Speaker initialized successfully with VLC player" << std::endl;
 	}
-
-	sendDeviceStatus();
 }
 
 void Speaker::setAlert(const std::string& soundFile, int vol) {

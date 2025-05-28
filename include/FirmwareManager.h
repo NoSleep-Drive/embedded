@@ -46,14 +46,18 @@ private:
 
 	// 스레드
 	std::thread mainThread;
+	std::mutex detectionMutex;
 
 	// 내부 메서드
 	void mainLoop();
 	bool processSingleFrame();
-	bool requestDiagnosis();
+	void requestDiagnosis();
 	void initializeDevices();
 	void handleVehicleStopped();
 	void handleSleepinessDetected(const std::string& timestamp);
+
+	// 장치 상태 백엔드 전송
+	void sendDeviceStatusToBackend();
 
 	// NumPy 초기화 메서드
 	bool initializePythonAndNumpy();
