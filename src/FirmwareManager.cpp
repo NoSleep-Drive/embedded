@@ -200,13 +200,6 @@ void FirmwareManager::mainLoop() {
 	const auto frameInterval = std::chrono::microseconds(42000);	// 0.042초 (42ms)
 	auto lastFrameTime = std::chrono::high_resolution_clock::now();
 
-	// 실시간 프레임 저장 폴더 생성
-	auto now = std::chrono::system_clock::now();
-	auto now_time_t = std::chrono::system_clock::to_time_t(now);
-	std::stringstream ss;
-	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
-	std::string recentFolder = utils->createSleepinessDir(ss.str() + "_recent");
-
 	while (isRunning.load()) {
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		auto elapsedTime = currentTime - lastFrameTime;
@@ -383,6 +376,22 @@ bool FirmwareManager::processSingleFrame() {
 	// 프레임 저장
 	utils->saveFrameToCurrentFrameFolder(resizedFrame, timestamp + ".jpg");
 
+	if (utils->IsSavingSleepinessEvidence) {
+		// 졸음 근거 영상 저장
+		if (!utils->saveFrameToSleepinessFolder(resizedFrame, timestamp + ".jpg")) {
+			std::cerr << "Error saving sleepiness evidence frame" << std::endl;
+		}
+
+		// 졸음 근거 영상 카운트 증가
+		utils->sleepinessEvidenceCount++;
+
+		if (utils->sleepinessEvidenceCount >= utils->MAX_SLEEPINESS_EVIDENCE_COUNT) {
+			std::cout << "졸음 근거 영상 저장 완료" << std::endl;
+			utils->IsSavingSleepinessEvidence = false;
+			utils->sleepinessEvidenceCount = 0;
+		}
+	}
+
 	// 6. AI 서버로 이미지 전송
 	sleepinessDetector->sendDriverFrame(preprocessedFrame);
 
@@ -394,8 +403,11 @@ void FirmwareManager::requestDiagnosis() {
 
 	auto now = std::chrono::system_clock::now();
 	auto now_time_t = std::chrono::system_clock::to_time_t(now);
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
 	std::stringstream ss;
 	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
+	ss << '_' << std::setfill('0') << std::setw(3) << ms.count();
 	std::string timestamp = ss.str();
 
 	// 별도 스레드에서 비동기 호출
@@ -424,6 +436,8 @@ void FirmwareManager::requestDiagnosis() {
 					if (finalSleepy) {
 						std::lock_guard<std::mutex> lock(detectionMutex);
 						handleSleepinessDetected(timestamp);
+					} else {
+						previousSleepy = false;
 					}
 					diagnosticCycle++;
 				});
@@ -436,17 +450,43 @@ void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
 	// 1. 경고음 출력
 	speaker->triggerAlert();
 
-	// 2. 졸음 근거 영상 저장 폴더 생성
+	// 이전 졸음 진단이 true일때, 이전 졸음 근거 영상 폴더를 삭제 후 현재 폴더로 변경
+	if (previousSleepy) {
+		std::cout << "이전 졸음 근거 영상 폴더 삭제" << std::endl;
+		utils->removeSleepinessEvidenceFolder();
+	}
+
 	std::string sleepDir = utils->createSleepinessDir(timestamp);
 	std::cout << "졸음 영상 저장 경로: " << sleepDir << std::endl;
 
-	// 3. 현재까지의 프레임 저장
-	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder();
+	// 폴더 생성 될때까지 잠시 대기
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+	std::cout << "폴더 생성 요청 완료" << std::endl;
+
+	// 3. 진단 시점부터 앞 2.5초 프레임 가져오기
+	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder(timestamp);
+
+	// 4. 최근 프레임을 졸음 근거 영상 폴더에 저장
+	for (size_t i = 0; i < recentFrames.size(); ++i) {
+		std::string frameName = "frame_" + std::to_string(i) + ".jpg";
+		if (!utils->saveFrameToSleepinessFolder(recentFrames[i], frameName)) {
+			std::cerr << "Error saving frame: " << frameName << std::endl;
+		}
+	}
+
+	utils->IsSavingSleepinessEvidence = true;
+	utils->sleepinessEvidenceCount = 0;
+
+	// TODO: DB 전송 스레드 생성은 진단이 FALSE인 경우에 실행하도록 변경 필요
+	// (diagnosisResultStack에서 폴더 경로 빼와서 스레드 생성)
 	// 4. DB 전송 스레드 생성 및 큐에 추가
 	auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
 	threadMonitor->addDBThread(dbThread);
 
 	// 5. 스레드 실행 상태 설정
 	threadMonitor->setIsDBThreadRunning(true);
+
+	// 6. 이전 졸음 상태 업데이트
+	previousSleepy = true;
 }

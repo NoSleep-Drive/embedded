@@ -11,28 +11,35 @@ void setEnvVar(const std::string& key, const std::string& value);
 
 class Utils {
 public:
-    Utils(const std::string& saveDirectory = "./frames");
+	Utils(const std::string& saveDirectory = "./frames");
 
-    bool saveFrame(const cv::Mat& frame, const std::string& path, const std::string& name);
+	bool saveFrame(const cv::Mat& frame, const std::string& path, const std::string& name);
 
-    bool saveFrameToCurrentFrameFolder(const cv::Mat& frame, const std::string& name);
+	bool saveFrameToCurrentFrameFolder(const cv::Mat& frame, const std::string& name);
 
-    bool saveFrameToSleepinessFolder(const cv::Mat& frame, const std::string& name);
+	bool saveFrameToSleepinessFolder(const cv::Mat& frame, const std::string& name);
 
-    bool removeFolder(const std::string& path);
+	bool removeSleepinessEvidenceFolder() { return removeFolder(sleepFolder); }
+
+	bool removeFolder(const std::string& path);
+
+	std::vector<cv::Mat> loadFramesFromRecentFolder(const std::string& timeStamp);
 
     std::vector<cv::Mat> loadFramesFromRecentFolder();
 
-    std::vector<cv::Mat> loadFramesFromFolder(const std::string& folderPath);
+	std::string createSleepinessDir(const std::string& timeStamp);
 
-    std::string createSleepinessDir(const std::string& timeStamp);
+	void loadEnvFile(const std::string& filename);
 
-    void loadEnvFile(const std::string& filename);
+	// 졸음 근거 영상 저장
+	int sleepinessEvidenceCount = 0;
+	const int MAX_SLEEPINESS_EVIDENCE_COUNT = 60;
+	bool IsSavingSleepinessEvidence = false;
 
 private:
-    std::string saveDirectory;
-    std::string recentFolder;
-    std::string sleepFolder;
+	std::string saveDirectory;
+	std::string recentFolder;
+	std::string sleepFolder;
 };
 
 #endif

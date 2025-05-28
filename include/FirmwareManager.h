@@ -48,6 +48,9 @@ private:
 	std::thread mainThread;
 	std::mutex detectionMutex;
 
+	// 이전 졸음 상태
+	bool previousSleepy = false;
+
 	// 내부 메서드
 	void mainLoop();
 	bool processSingleFrame();
