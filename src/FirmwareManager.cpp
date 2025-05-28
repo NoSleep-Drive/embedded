@@ -239,7 +239,6 @@ void FirmwareManager::mainLoop() {
 			if (frameCycle >= 24) {
 				frameCycle = 0;
 				requestDiagnosis();
-				diagnosticCycle++;
 			}
 		} else {
 			// CPU 점유율 감소를 위해 짧은 시간 대기
@@ -418,12 +417,15 @@ void FirmwareManager::requestDiagnosis() {
 						std::cout << "로컬 알고리즘으로 진단을 실시합니다." << std::endl;
 						std::lock_guard<std::mutex> lock(detectionMutex);
 						finalSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
+						std::cout << "로컬 진단 호출 사이클" << diagnosticCycle << ": "
+											<< (finalSleepy ? "졸음 감지됨" : "졸음 아님") << std::endl;
 					}
 
 					if (finalSleepy) {
 						std::lock_guard<std::mutex> lock(detectionMutex);
 						handleSleepinessDetected(timestamp);
 					}
+					diagnosticCycle++;
 				});
 	}).detach();
 }
