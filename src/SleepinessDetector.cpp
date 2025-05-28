@@ -73,41 +73,16 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 	// 요청 URL 생성
 	std::string url = serverIP + "/api/save/frame";
 
-	// API 요청
-	cpr::Response r = cpr::Post(cpr::Url{url}, cpr::Header{{"Content-Type", "application/json"}},
-															cpr::Body{jsonData.dump()});
-
-	// 응답 처리
-	if (r.status_code == 200) {
-		try {
-			nlohmann::json response = nlohmann::json::parse(r.text);
-
-			if (response.contains("success") && response["success"] == true) {
-				std::cout << "프레임 #" << (frameIndex - 1) << " 전송 성공" << std::endl;
-			} else {
-				std::cerr << "프레임 전송 실패 - 응답: " << r.text << std::endl;
-			}
-		} catch (const std::exception& e) {
-			std::cerr << "응답 파싱 오류: " << e.what() << std::endl;
-		}
-	} else {
-		std::cerr << "프레임 전송 실패 - 상태 코드: " << r.status_code << std::endl;
-
-		try {
-			nlohmann::json response = nlohmann::json::parse(r.text);
-
-			if (response.contains("success") && response["success"] == false &&
-					response.contains("error")) {
-				auto& error = response["error"];
-				std::cerr << "오류 코드: " << error["code"] << std::endl;
-				std::cerr << "오류 메시지: " << error["message"] << std::endl;
-				std::cerr << "오류 메서드: " << error["method"] << std::endl;
-				std::cerr << "상세 메시지: " << error["detail_message"] << std::endl;
-			}
-		} catch (const std::exception& e) {
-			std::cerr << "오류 응답 파싱 실패: " << e.what() << std::endl;
-		}
-	}
+	// 콜백 기반 비동기 요청
+	cpr::PostCallback(
+			[](cpr::Response r) {
+				if (r.error) {
+					std::cerr << "통신 오류: " << r.error.message << std::endl;
+				}
+			},
+			cpr::Url{url}, cpr::Header{{"Content-Type", "application/json"}}, cpr::Body{jsonData.dump()},
+			cpr::Timeout{5000}	// 5초 타임아웃
+	);
 }
 
 bool SleepinessDetector::requestAIDetection(const std::string& uid,
