@@ -51,6 +51,9 @@ private:
 	// 이전 졸음 상태
 	bool previousSleepy = false;
 
+	// 졸음 진단 폴더 경로 저장 스택 (DB 스레드 모니터링용)
+	std::stack<std::string> sleepImgPathStack;
+
 	// 내부 메서드
 	void mainLoop();
 	bool processSingleFrame();

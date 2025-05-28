@@ -438,6 +438,16 @@ void FirmwareManager::requestDiagnosis() {
 						handleSleepinessDetected(timestamp);
 					} else {
 						previousSleepy = false;
+
+						// 스택에 저장된 졸음 근거 영상 폴더를 전부 DB 전송 스레드에 추가
+						while (!sleepImgPathStack.empty()) {
+							std::string sleepDir = sleepImgPathStack.top();
+							sleepImgPathStack.pop();
+
+							auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor);
+							threadMonitor->addDBThread(dbThread);
+						}
+						threadMonitor->setIsDBThreadRunning(true);
 					}
 					diagnosticCycle++;
 				});
@@ -454,6 +464,7 @@ void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
 	if (previousSleepy) {
 		std::cout << "이전 졸음 근거 영상 폴더 삭제" << std::endl;
 		utils->removeSleepinessEvidenceFolder();
+		sleepImgPathStack.pop();
 	}
 
 	std::string sleepDir = utils->createSleepinessDir(timestamp);
@@ -478,14 +489,8 @@ void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
 	utils->IsSavingSleepinessEvidence = true;
 	utils->sleepinessEvidenceCount = 0;
 
-	// TODO: DB 전송 스레드 생성은 진단이 FALSE인 경우에 실행하도록 변경 필요
-	// (diagnosisResultStack에서 폴더 경로 빼와서 스레드 생성)
-	// 4. DB 전송 스레드 생성 및 큐에 추가
-	auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
-	threadMonitor->addDBThread(dbThread);
-
-	// 5. 스레드 실행 상태 설정
-	threadMonitor->setIsDBThreadRunning(true);
+	// 5. 졸음 근거 영상 폴더 경로를 스택에 추가
+	sleepImgPathStack.push(sleepDir);
 
 	// 6. 이전 졸음 상태 업데이트
 	previousSleepy = true;
