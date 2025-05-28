@@ -390,46 +390,42 @@ bool FirmwareManager::processSingleFrame() {
 	return true;
 }
 
-bool FirmwareManager::requestDiagnosis() {
+void FirmwareManager::requestDiagnosis() {
 	std::cout << "Requesting sleepiness diagnosis (cycle " << diagnosticCycle << ")" << std::endl;
 
-	bool isSleepy = false;
-
-	// 1. 타임스탬프 생성
 	auto now = std::chrono::system_clock::now();
 	auto now_time_t = std::chrono::system_clock::to_time_t(now);
 	std::stringstream ss;
 	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
 	std::string timestamp = ss.str();
 
-	// 2. AI 서버에 진단 요청
-	bool aiResponse = false;
-	try {
-		aiResponse = sleepinessDetector->requestAIDetection(deviceUID, timestamp);
+	// 별도 스레드에서 비동기 호출
+	std::thread([this, timestamp]() {
+		sleepinessDetector->requestAIDetection(
+				deviceUID, timestamp,
+				[this, timestamp](bool success, bool isDrowsy, const std::string& message) {
+					bool finalSleepy = false;
 
-		// AI 서버 응답에 따라 졸음 판단
-		if (aiResponse) {
-			isSleepy = true;	// AI가 졸음으로 판단한 경우
-			std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
-		}
-	} catch (const std::exception& e) {
-		std::cerr << "AI 서버 진단 요청 중 오류: " << e.what() << std::endl;
-		// 예외 발생 시 aiResponse = false 유지
-	}
+					if (success) {
+						if (isDrowsy) {
+							std::cout << "AI 서버가 졸음으로 판단했습니다." << std::endl;
+							finalSleepy = true;
+						} else {
+							std::cout << "AI 서버 진단 결과: 졸음 아님 (" << message << ")" << std::endl;
+						}
+					} else {
+						std::cerr << "AI 서버 진단 실패: " << message << std::endl;
+						std::cout << "로컬 알고리즘으로 진단을 실시합니다." << std::endl;
+						std::lock_guard<std::mutex> lock(detectionMutex);
+						finalSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
+					}
 
-	// 3. AI 서버 응답이 없거나 통신 실패 시 로컬 알고리즘 사용
-	if (!aiResponse) {
-		std::cout << "AI 서버 응답 없음, 로컬 알고리즘으로 진단합니다." << std::endl;
-		// 로컬 눈 감음 데이터 기반 졸음 여부 판단
-		isSleepy = sleepinessDetector->getLocalDetection(*eyeClosureQueue);
-	}
-
-	// 4. 졸음으로 판단된 경우 처리
-	if (isSleepy) {
-		handleSleepinessDetected(timestamp);
-	}
-
-	return true;
+					if (finalSleepy) {
+						std::lock_guard<std::mutex> lock(detectionMutex);
+						handleSleepinessDetected(timestamp);
+					}
+				});
+	}).detach();
 }
 
 void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
