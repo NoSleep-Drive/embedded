@@ -57,19 +57,11 @@ void DeviceStatusManager::sendDeviceStatusToBackend() {
 	std::string status_2 = deviceStatus[1] ? "true" : "false";
 	std::string status_3 = deviceStatus[2] ? "true" : "false";
 
-	std::string jsonBody =
-			"{"
-			"\"deviceUid\": \"" +
-			deviceUid +
-			"\","
-			"\"cameraState\": " +
-			status_1 +
-			","
-			"\"accelerationSensorState\": " +
-			status_2 +
-			","
-			"\"speakerState\": " +
-			status_3 + "}";
+	nlohmann::json jsonData = {{"deviceUid", deviceUid},
+														 {"cameraState", deviceStatus[0]},
+														 {"accelerationSensorState", deviceStatus[1]},
+														 {"speakerState", deviceStatus[2]}};
+	std::string jsonBody = jsonData.dump();
 
 	std::cout << "백엔드로 장치 상태 전송 중..." << std::endl;
 	std::cout << "Camera: " << status_1 << ", AccelSensor: " << status_2 << ", Speaker: " << status_3
