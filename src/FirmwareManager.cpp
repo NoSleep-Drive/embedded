@@ -69,6 +69,9 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 			Py_DECREF(pModule);
 		}
 
+		PyEval_InitThreads();
+		PyEval_SaveThread();
+
 		// 객체들 초기화
 		std::cout << "컴포넌트 객체들 초기화 중..." << std::endl;
 		camera = std::make_unique<Camera>();
@@ -300,8 +303,9 @@ bool FirmwareManager::processSingleFrame() {
 
 	// 3. 눈 감음 판단 (Python 함수 호출)
 	bool eyesClosed = false;
-	PyGILState_STATE gstate = PyGILState_Ensure();
+	PyGILState_STATE gstate;
 	try {
+		gstate = PyGILState_Ensure();	 // GIL 획득
 		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
 		if (pModule != nullptr) {
 			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
@@ -358,6 +362,8 @@ bool FirmwareManager::processSingleFrame() {
 		std::cerr << "Error during eye detection: " << e.what() << std::endl;
 	}
 	PyGILState_Release(gstate);
+
+	std::cout << "눈 감음 상태: " << (eyesClosed ? "감김" : "열림") << std::endl;
 
 	// 4. 눈 감음 상태 저장
 	eyeClosureQueue->saveEyeClosureStatus(eyesClosed);
