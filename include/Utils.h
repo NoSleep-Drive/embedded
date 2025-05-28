@@ -1,10 +1,9 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <string>
-#include <opencv2/opencv.hpp>
-
 #include <cstdlib>
+#include <opencv2/opencv.hpp>
+#include <queue>
 #include <string>
 
 void setEnvVar(const std::string& key, const std::string& value);
@@ -25,7 +24,7 @@ public:
 
 	std::vector<cv::Mat> loadFramesFromRecentFolder(const std::string& timeStamp);
 
-    std::vector<cv::Mat> loadFramesFromRecentFolder();
+	std::vector<cv::Mat> loadFramesFromFolder(const std::string& folderPath);
 
 	std::string createSleepinessDir(const std::string& timeStamp);
 

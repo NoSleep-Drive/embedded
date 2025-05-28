@@ -85,8 +85,55 @@ std::vector<cv::Mat> Utils::loadFramesFromFolder(const std::string& folderName) 
 	return frames;
 }
 
-std::vector<cv::Mat> Utils::loadFramesFromRecentFolder() {
-    return loadFramesFromFolder(recentFolder);
+std::vector<cv::Mat> Utils::loadFramesFromRecentFolder(const std::string& timeStamp) {
+	if (timeStamp.empty()) {
+		std::cerr << "Error: Time stamp is empty, cannot load frames." << std::endl;
+		return {};
+	}
+
+	std::string folderPath = saveDirectory + recentFolder;
+	long long timeStampNum = std::stoll(timeStamp);
+	long long lowerBound = timeStampNum - 2500;
+
+	using FileEntry = std::pair<long long, std::string>;	// (timestamp, path)
+	auto cmp = [](const FileEntry& a, const FileEntry& b) {
+		return a.first > b.first;
+	};	// Min-heap by timestamp
+	std::priority_queue<FileEntry, std::vector<FileEntry>, decltype(cmp)> minHeap(cmp);
+
+	for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
+		const std::string fileName = entry.path().stem().string();	// 확장자 제외
+
+		// 빠른 유효성 검사: 파일명이 17자리 이상 숫자인지
+		if (fileName.size() < 17 || !std::all_of(fileName.begin(), fileName.end(), ::isdigit)) continue;
+
+		long long fileTime = std::stoll(fileName);
+		if (fileTime <= timeStampNum && fileTime >= lowerBound) {
+			minHeap.emplace(fileTime, entry.path().string());
+			if (minHeap.size() > MAX_SLEEPINESS_EVIDENCE_COUNT) {
+				minHeap.pop();	// 가장 오래된 파일 제거
+			}
+		}
+	}
+
+	// 힙에서 최신순으로 추출
+	std::vector<FileEntry> selectedFiles;
+	while (!minHeap.empty()) {
+		selectedFiles.push_back(minHeap.top());
+		minHeap.pop();
+	}
+	std::sort(selectedFiles.rbegin(), selectedFiles.rend());	// 최신순으로 정렬
+
+	// 이미지 로드
+	std::vector<cv::Mat> frames;
+	for (const auto& [fileTime, path] : selectedFiles) {
+		cv::Mat img = cv::imread(path);
+		if (!img.empty()) {
+			frames.push_back(img);
+		}
+	}
+
+	return frames;
 }
 
 std::string Utils::createSleepinessDir(const std::string& timeStamp) {
