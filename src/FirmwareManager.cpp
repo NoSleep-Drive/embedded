@@ -190,7 +190,6 @@ void FirmwareManager::mainLoop() {
 	std::stringstream ss;
 	ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S");
 	std::string recentFolder = utils->createSleepinessDir(ss.str() + "_recent");
-
 	while (isRunning.load()) {
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		auto elapsedTime = currentTime - lastFrameTime;
@@ -222,7 +221,9 @@ void FirmwareManager::mainLoop() {
 			frameCycle++;
 			if (frameCycle >= 24) {
 				frameCycle = 0;
-				requestDiagnosis();
+				std::thread([this]() {
+					this->requestDiagnosis();
+					}).detach();
 				diagnosticCycle++;
 			}
 		} else {
@@ -284,7 +285,7 @@ bool FirmwareManager::processSingleFrame() {
 		std::cout << "OpenCV error during preprocessing: " << e.what() << std::endl;
 		return false;
 	}
-
+	std::cout << "preprocessed" << std::endl;
 	// 3. 눈 감음 판단 (Python 함수 호출)
 	bool eyesClosed = false;
 	PyGILState_STATE gstate;
@@ -368,10 +369,13 @@ bool FirmwareManager::processSingleFrame() {
 	utils->saveFrameToCurrentFrameFolder(resizedFrame, timestamp + ".jpg");
 
 	// 6. AI 서버로 이미지 전송
-	sleepinessDetector->sendDriverFrame(preprocessedFrame);
+	std::thread([this, preprocessedFrame]() {
+		this->sleepinessDetector->sendDriverFrame(preprocessedFrame);
+		}).detach();
 
 	return true;
 }
+
 
 bool FirmwareManager::requestDiagnosis() {
 	std::cout << "Requesting sleepiness diagnosis (cycle " << diagnosticCycle << ")" << std::endl;

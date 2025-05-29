@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <future>
 
 // Python.h 및 NumPy 헤더 포함
 #include <Python.h>

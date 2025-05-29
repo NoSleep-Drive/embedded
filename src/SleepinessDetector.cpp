@@ -80,42 +80,9 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 		cpr::Body{ data });
 		}, url, jsonData.dump()).detach();
 
-
-	// 응답 처리
-	/*if (r.status_code == 200) {
-		try {
-			nlohmann::json response = nlohmann::json::parse(r.text);
-
-			if (response.contains("success") && response["success"] == true) {
-				std::cout << "프레임 #" << (frameIndex - 1) << " 전송 성공" << std::endl;
-			} else {
-				std::cerr << "프레임 전송 실패 - 응답: " << r.text << std::endl;
-			}
-		} catch (const std::exception& e) {
-			std::cerr << "응답 파싱 오류: " << e.what() << std::endl;
-		}
-	} else {
-		std::cerr << "프레임 전송 실패 - 상태 코드: " << r.status_code << std::endl;
-
-		try {
-			nlohmann::json response = nlohmann::json::parse(r.text);
-
-			if (response.contains("success") && response["success"] == false &&
-					response.contains("error")) {
-				auto& error = response["error"];
-				std::cerr << "오류 코드: " << error["code"] << std::endl;
-				std::cerr << "오류 메시지: " << error["message"] << std::endl;
-				std::cerr << "오류 메서드: " << error["method"] << std::endl;
-				std::cerr << "상세 메시지: " << error["detail_message"] << std::endl;
-			}
-		} catch (const std::exception& e) {
-			std::cerr << "오류 응답 파싱 실패: " << e.what() << std::endl;
-		}
-	}*/
 }
 
-bool SleepinessDetector::requestAIDetection(const std::string& uid,
-																						const std::string& requestTime) {
+bool SleepinessDetector::requestAIDetection(const std::string& uid, const std::string& requestTime) {
 	std::cout << "AI Server 진단 요청하는 파이 UID : " << uid << " 및 요청 시각 : " << requestTime
 						<< std::endl;
 
@@ -135,7 +102,10 @@ bool SleepinessDetector::requestAIDetection(const std::string& uid,
 
 	std::string url = serverIP + "/diagnosis/drowiness?deviceUid=" + encodedUid;
 
-	cpr::Response r = cpr::Get(cpr::Url{url});
+	cpr::Response r = cpr::Get(
+		cpr::Url{url},
+		cpr::Timeout{ 3000 }
+	);
 
 	if (r.status_code != 200) {
 		std::cerr << "서버 응답 실패 - 상태 코드: " << r.status_code << "\n본문: " << r.text
