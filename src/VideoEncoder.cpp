@@ -62,6 +62,5 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
 	}
 
 	tempVideoFile.close();
-	// 필요 시 임시 비디오 파일 삭제 로직 추가
 	return videoBuffer;
 }
