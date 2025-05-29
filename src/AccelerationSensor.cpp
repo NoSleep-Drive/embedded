@@ -147,7 +147,7 @@ MockAccelerationSensor::MockAccelerationSensor()
 		: xAcceleration(0.0f),
 			yAcceleration(0.0f),
 			zAcceleration(9.8f),
-			moving(false),
+			moving(true),
 			rng(std::chrono::system_clock::now().time_since_epoch().count()),
 			dist(-0.2f, 0.2f) {}
 

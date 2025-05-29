@@ -19,18 +19,25 @@ public:
 
     bool saveFrameToSleepinessFolder(const cv::Mat& frame, const std::string& name);
 
+    bool removeSleepinessEvidenceFolder() { return removeFolder(sleepFolder); }
+
     bool removeFolder(const std::string& path);
 
-    std::vector<cv::Mat> loadFramesFromRecentFolder();
+    std::vector<cv::Mat> loadFramesFromRecentFolder(const std::string& timeStamp);
 
-    std::vector<cv::Mat> loadFramesFromFolder(const std::string& folderPath);
+    std::vector<std::pair<std::string, std::string>> getRecentFramePathsAndNames(
+        const std::string& timeStamp);
 
     std::string createSleepinessDir(const std::string& timeStamp);
 
     void loadEnvFile(const std::string& filename);
 
-private:
+    int sleepinessEvidenceCount = 0;
+    const int MAX_SLEEPINESS_EVIDENCE_COUNT = 60;
+    bool IsSavingSleepinessEvidence = false;
     std::string saveDirectory;
+
+private:
     std::string recentFolder;
     std::string sleepFolder;
 };
