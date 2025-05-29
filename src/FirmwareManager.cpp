@@ -474,14 +474,19 @@ void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
 	std::string sleepDir = utils->createSleepinessDir(timestamp);
 	std::cout << "졸음 영상 저장 경로: " << sleepDir << std::endl;
 
-	// 3. 진단 시점부터 앞 2.5초 프레임 가져오기
-	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder(timestamp);
+	// 3. 진단 시점부터 앞 2.5초 프레임 가져오기 (파일 경로와 파일명도 같이 가져오도록 수정 필요)
+	std::vector<std::pair<std::string, std::string>> recentFrames =
+			utils->getRecentFramePathsAndNames(timestamp);
 
-	// 4. 최근 프레임을 졸음 근거 영상 폴더에 저장
-	for (size_t i = 0; i < recentFrames.size(); ++i) {
-		std::string frameName = "frame_" + std::to_string(i) + ".jpg";
-		if (!utils->saveFrameToSleepinessFolder(recentFrames[i], frameName)) {
-			std::cerr << "Error saving frame: " << frameName << std::endl;
+	// 4. 최근 프레임을 졸음 근거 영상 폴더에 원본 파일명으로 저장
+	for (const auto& [filePath, fileName] : recentFrames) {
+		// .frames/yyyyMMdd_HHmmss_fff/fimename.jpg 형태로 저장
+		std::string destPath = utils->saveDirectory + sleepDir + "/" + fileName;
+		try {
+			std::filesystem::copy_file(filePath, destPath,
+																 std::filesystem::copy_options::overwrite_existing);
+		} catch (const std::exception& e) {
+			std::cerr << "Error copying frame file: " << e.what() << std::endl;
 		}
 	}
 

@@ -3,7 +3,6 @@
 
 #include <cstdlib>
 #include <opencv2/opencv.hpp>
-#include <queue>
 #include <string>
 
 void setEnvVar(const std::string& key, const std::string& value);
@@ -24,7 +23,8 @@ public:
 
 	std::vector<cv::Mat> loadFramesFromRecentFolder(const std::string& timeStamp);
 
-	std::vector<cv::Mat> loadFramesFromFolder(const std::string& folderPath);
+	std::vector<std::pair<std::string, std::string>> getRecentFramePathsAndNames(
+			const std::string& timeStamp);
 
 	std::string createSleepinessDir(const std::string& timeStamp);
 
@@ -35,8 +35,9 @@ public:
 	const int MAX_SLEEPINESS_EVIDENCE_COUNT = 60;
 	bool IsSavingSleepinessEvidence = false;
 
-private:
 	std::string saveDirectory;
+
+private:
 	std::string recentFolder;
 	std::string sleepFolder;
 };

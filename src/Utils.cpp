@@ -60,23 +60,45 @@ bool Utils::removeFolder(const std::string& folderName) {
 	return false;
 }
 
-std::vector<cv::Mat> Utils::loadFramesFromFolder(const std::string& folderName) {
-	std::vector<cv::Mat> frames;
-	std::vector<std::filesystem::directory_entry> entries;
-	std::string fullPath = saveDirectory + "/" + folderName;
-	if (!std::filesystem::exists(fullPath)) {
-		std::cerr << "Directory does not exist: " << fullPath << std::endl;
-		return frames;	// Return empty vector if directory does not exist
+std::vector<cv::Mat> Utils::loadFramesFromRecentFolder(const std::string& timeStamp) {
+	if (timeStamp.empty()) {
+		std::cerr << "Error: Time stamp is empty, cannot load frames." << std::endl;
+		return {};
 	}
-	for (const auto& entry : std::filesystem::directory_iterator(fullPath)) {
+
+	std::string folderPath = saveDirectory + recentFolder;
+
+	// timeStamp를 long long으로 변환 (년월일_시간분초_밀리초 -> 숫자 비교)
+	long long timeStampNum = std::stoll(timeStamp);
+
+	// 선택된 파일 리스트 (파일명, 경로)
+	std::vector<std::pair<long long, std::string>> selectedFiles;
+
+	for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
 		if (entry.path().extension() == ".jpg" || entry.path().extension() == ".png") {
-			entries.push_back(entry);
+			std::string fileName = entry.path().stem().string();	// 확장자 제외
+			try {
+				long long fileTime = std::stoll(fileName);
+				if (fileTime <= timeStampNum && fileTime >= timeStampNum - 2500) {
+					selectedFiles.emplace_back(fileTime, entry.path().string());
+				}
+			} catch (const std::invalid_argument& e) {
+				std::cerr << "Warning: Invalid file name encountered: " << fileName << std::endl;
+				continue;
+			}
 		}
 	}
-	std::sort(entries.begin(), entries.end(),
-						[](const auto& a, const auto& b) { return a.path().string() < b.path().string(); });
-	for (const auto& entry : entries) {
-		cv::Mat img = cv::imread(entry.path().string());
+
+	// 최신순으로 정렬 (파일명 숫자가 클수록 최신)
+	std::sort(selectedFiles.begin(), selectedFiles.end(),
+						[](const auto& a, const auto& b) { return a.first > b.first; });
+
+	// 최대 MAX_SLEEPINESS_EVIDENCE_COUNT개의 프레임만 읽기
+	std::vector<cv::Mat> frames;
+	for (size_t i = 0;
+			 i < std::min(selectedFiles.size(), static_cast<size_t>(MAX_SLEEPINESS_EVIDENCE_COUNT));
+			 ++i) {
+		cv::Mat img = cv::imread(selectedFiles[i].second);
 		if (!img.empty()) {
 			frames.push_back(img);
 		}
@@ -85,55 +107,45 @@ std::vector<cv::Mat> Utils::loadFramesFromFolder(const std::string& folderName) 
 	return frames;
 }
 
-std::vector<cv::Mat> Utils::loadFramesFromRecentFolder(const std::string& timeStamp) {
+// recent 폴더에서 timestamp 기준 최근 2.5초의 파일 경로와 파일명을 반환
+std::vector<std::pair<std::string, std::string>> Utils::getRecentFramePathsAndNames(
+		const std::string& timeStamp) {
+	std::vector<std::pair<std::string, std::string>> files;
+
 	if (timeStamp.empty()) {
 		std::cerr << "Error: Time stamp is empty, cannot load frames." << std::endl;
-		return {};
+		return files;
 	}
 
 	std::string folderPath = saveDirectory + recentFolder;
 	long long timeStampNum = std::stoll(timeStamp);
-	long long lowerBound = timeStampNum - 2500;
 
-	using FileEntry = std::pair<long long, std::string>;	// (timestamp, path)
-	auto cmp = [](const FileEntry& a, const FileEntry& b) {
-		return a.first > b.first;
-	};	// Min-heap by timestamp
-	std::priority_queue<FileEntry, std::vector<FileEntry>, decltype(cmp)> minHeap(cmp);
-
+	std::vector<std::pair<long long, std::filesystem::directory_entry>> selectedFiles;
 	for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
-		const std::string fileName = entry.path().stem().string();	// 확장자 제외
-
-		// 빠른 유효성 검사: 파일명이 17자리 이상 숫자인지
-		if (fileName.size() < 17 || !std::all_of(fileName.begin(), fileName.end(), ::isdigit)) continue;
-
-		long long fileTime = std::stoll(fileName);
-		if (fileTime <= timeStampNum && fileTime >= lowerBound) {
-			minHeap.emplace(fileTime, entry.path().string());
-			if (minHeap.size() > MAX_SLEEPINESS_EVIDENCE_COUNT) {
-				minHeap.pop();	// 가장 오래된 파일 제거
+		if (entry.path().extension() == ".jpg" || entry.path().extension() == ".png") {
+			std::string fileName = entry.path().stem().string();
+			try {
+				long long fileTime = std::stoll(fileName);
+				if (fileTime <= timeStampNum && fileTime >= timeStampNum - 2500) {
+					selectedFiles.emplace_back(fileTime, entry);
+				}
+			} catch (const std::invalid_argument&) {
+				continue;
 			}
 		}
 	}
 
-	// 힙에서 최신순으로 추출
-	std::vector<FileEntry> selectedFiles;
-	while (!minHeap.empty()) {
-		selectedFiles.push_back(minHeap.top());
-		minHeap.pop();
-	}
-	std::sort(selectedFiles.rbegin(), selectedFiles.rend());	// 최신순으로 정렬
+	std::sort(selectedFiles.begin(), selectedFiles.end(),
+						[](const auto& a, const auto& b) { return a.first > b.first; });
 
-	// 이미지 로드
-	std::vector<cv::Mat> frames;
-	for (const auto& [fileTime, path] : selectedFiles) {
-		cv::Mat img = cv::imread(path);
-		if (!img.empty()) {
-			frames.push_back(img);
-		}
+	for (size_t i = 0;
+			 i < std::min(selectedFiles.size(), static_cast<size_t>(MAX_SLEEPINESS_EVIDENCE_COUNT));
+			 ++i) {
+		files.emplace_back(selectedFiles[i].second.path().string(),
+											 selectedFiles[i].second.path().filename().string());
 	}
 
-	return frames;
+	return files;
 }
 
 std::string Utils::createSleepinessDir(const std::string& timeStamp) {
