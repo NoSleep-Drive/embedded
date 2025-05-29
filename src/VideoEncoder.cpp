@@ -9,8 +9,6 @@
 #include <fstream>
 
 std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
-    // example path(folderPath): ./frames/20250519_023859
-    //std::cout << "파일 경로 " << path << " 생성 시간 기준 전후 각각 2.5초 이미지 프레임들을 영상으로 변환" << std::endl;
     std::vector<cv::String> framePaths;
     std::vector<uchar> videoBuffer;
 
@@ -19,13 +17,9 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     std::istringstream ss(folderName);
     ss >> std::get_time(&folderTime, "%Y%m%d_%H%M%S");
 
-    if (ss.fail()) {
-        //std::cerr << "폴더 이름에서 타임스탬프를 파싱할 수 없음: " << folderName << std::endl;
-        return videoBuffer;
-    }
+    if (ss.fail()) return videoBuffer;
 
     auto baseTime = std::chrono::system_clock::from_time_t(std::mktime(&folderTime));
-
     auto startTime = baseTime - std::chrono::milliseconds(2500);
     auto endTime = baseTime + std::chrono::milliseconds(2500);
 
@@ -41,7 +35,6 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
         if (dirSS.fail()) continue;
 
         auto dirTimePoint = std::chrono::system_clock::from_time_t(std::mktime(&dirTime));
-
         if (dirTimePoint >= startTime && dirTimePoint <= endTime) {
             for (const auto& imgEntry : std::filesystem::directory_iterator(entry)) {
                 if (imgEntry.path().extension() == ".jpg" || imgEntry.path().extension() == ".png") {
@@ -51,16 +44,15 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
         }
     }
 
-    if (framePaths.empty()) {
-        std::cerr << "선택된 시간 범위에 이미지가 없음" << std::endl;
-        return videoBuffer;
-    }
+    if (framePaths.empty()) return videoBuffer;
 
     const cv::Size frameSize(1280, 720);
     auto tmp = std::filesystem::temp_directory_path() / ("video_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
     std::string tempVideoPath = tmp.string();
-    cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate, frameSize);
+    std::string fixedVideoPath = tempVideoPath + "_fixed.mp4";
 
+    // OpenCV로 MP4 생성
+    cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate, frameSize);
     for (const auto& frame : framePaths) {
         cv::Mat img = cv::imread(frame);
         if (img.empty()) continue;
@@ -69,23 +61,39 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     }
     writer.release();
 
-    std::ifstream tempVideoFile(tempVideoPath, std::ios::binary | std::ios::ate);
-    if (!tempVideoFile) {
-        std::cerr << "임시 비디오 파일을 읽을 수 없음" << std::endl;
+    // ffmpeg 후처리: moov atom 앞으로 이동
+    std::string command = "ffmpeg -y -i \"" + tempVideoPath + "\" -movflags faststart \"" + fixedVideoPath + "\"";
+    int result = std::system(command.c_str());
+    if (result != 0) {
+        std::cerr << "ffmpeg 실행 실패" << std::endl;
+        std::filesystem::remove(tempVideoPath);
         return videoBuffer;
     }
 
-    std::streamsize size = tempVideoFile.tellg();
-    tempVideoFile.seekg(0, std::ios::beg);
+    // fixed mp4 파일을 메모리로 읽기
+    std::ifstream fixedVideoFile(fixedVideoPath, std::ios::binary | std::ios::ate);
+    if (!fixedVideoFile) {
+        std::cerr << "fixed 비디오 파일을 읽을 수 없음" << std::endl;
+        std::filesystem::remove(tempVideoPath);
+        std::filesystem::remove(fixedVideoPath);
+        return videoBuffer;
+    }
+
+    std::streamsize size = fixedVideoFile.tellg();
+    fixedVideoFile.seekg(0, std::ios::beg);
 
     videoBuffer.resize(size);
-    if (!tempVideoFile.read(reinterpret_cast<char*>(videoBuffer.data()), size)) {
-        std::cerr << "임시 비디오 파일을 메모리에 로드하는 데 실패" << std::endl;
+    if (!fixedVideoFile.read(reinterpret_cast<char*>(videoBuffer.data()), size)) {
+        std::cerr << "fixed 비디오 파일을 메모리에 로드하는 데 실패" << std::endl;
+        fixedVideoFile.close();
+        std::filesystem::remove(tempVideoPath);
+        std::filesystem::remove(fixedVideoPath);
         return videoBuffer;
     }
 
-    tempVideoFile.close();
+    fixedVideoFile.close();
     std::filesystem::remove(tempVideoPath);
+    std::filesystem::remove(fixedVideoPath);
 
     return videoBuffer;
 }
