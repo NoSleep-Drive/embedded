@@ -71,7 +71,7 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 			{"deviceUid", deviceUidEnv}, {"frameIdx", frameIndex++}, {"driverFrame", base64Image}};
 
 	// 요청 URL 생성
-	std::string url = serverIP + "/api/save/frame";
+	std::string url = serverIP + "/save/frame";
 
 	// 콜백 기반 비동기 요청
 	cpr::PostCallback(
@@ -106,7 +106,7 @@ void SleepinessDetector::requestAIDetection(
 	auto encodedSecure = cpr::util::urlEncode(deviceUidEnv);
 	std::string encodedUid(encodedSecure.begin(), encodedSecure.end());
 
-	std::string url = serverIP + "/diagnosis/drowiness?deviceUid=" + encodedUid;
+	std::string url = serverIP + "/diagnosis/drowsiness?deviceUid=" + encodedUid;
 
 	// 동기 HTTP 요청 (2초 타임아웃)
 	cpr::Response r = cpr::Get(cpr::Url{url}, cpr::Timeout{2000});
