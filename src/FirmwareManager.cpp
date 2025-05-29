@@ -152,6 +152,7 @@ void FirmwareManager::start() {
 		isPaused.store(false);
 
 		// 메인 루프 스레드 시작
+		speaker->triggerStart();	// 시작 사운드 재생
 		mainThread = std::thread(&FirmwareManager::mainLoop, this);
 
 		std::cout << "FirmwareManager started" << std::endl;
