@@ -10,8 +10,6 @@
 #include <vector>
 
 std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
-	std::cout << "파일 경로 " << path
-						<< " 생성 시간 기준 전후 각각 2.5초 이미지 프레임들을 영상으로 변환" << std::endl;
 	std::vector<cv::String> framePaths;
 	std::vector<uchar> videoBuffer;
 
@@ -35,9 +33,11 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
 						 ("video_" +
 							std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
 	std::string tempVideoPath = tmp.string();
+	std::string fixedVideoPath = tempVideoPath + "_fixed.mp4";
+
+	// OpenCV로 MP4 생성
 	cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate,
 												 frameSize);
-
 	for (const auto& frame : framePaths) {
 		cv::Mat img = cv::imread(frame);
 		if (img.empty()) continue;
@@ -46,21 +46,40 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
 	}
 	writer.release();
 
-	std::ifstream tempVideoFile(tempVideoPath, std::ios::binary | std::ios::ate);
-	if (!tempVideoFile) {
-		std::cerr << "임시 비디오 파일을 읽을 수 없음" << std::endl;
+	// ffmpeg 후처리: moov atom 앞으로 이동
+	std::string command =
+			"ffmpeg -y -i \"" + tempVideoPath + "\" -movflags faststart \"" + fixedVideoPath + "\"";
+	int result = std::system(command.c_str());
+	if (result != 0) {
+		std::cerr << "ffmpeg 실행 실패" << std::endl;
+		std::filesystem::remove(tempVideoPath);
 		return videoBuffer;
 	}
 
-	std::streamsize size = tempVideoFile.tellg();
-	tempVideoFile.seekg(0, std::ios::beg);
+	// fixed mp4 파일을 메모리로 읽기
+	std::ifstream fixedVideoFile(fixedVideoPath, std::ios::binary | std::ios::ate);
+	if (!fixedVideoFile) {
+		std::cerr << "fixed 비디오 파일을 읽을 수 없음" << std::endl;
+		std::filesystem::remove(tempVideoPath);
+		std::filesystem::remove(fixedVideoPath);
+		return videoBuffer;
+	}
+
+	std::streamsize size = fixedVideoFile.tellg();
+	fixedVideoFile.seekg(0, std::ios::beg);
 
 	videoBuffer.resize(size);
-	if (!tempVideoFile.read(reinterpret_cast<char*>(videoBuffer.data()), size)) {
-		std::cerr << "임시 비디오 파일을 메모리에 로드하는 데 실패" << std::endl;
+	if (!fixedVideoFile.read(reinterpret_cast<char*>(videoBuffer.data()), size)) {
+		std::cerr << "fixed 비디오 파일을 메모리에 로드하는 데 실패" << std::endl;
+		fixedVideoFile.close();
+		std::filesystem::remove(tempVideoPath);
+		std::filesystem::remove(fixedVideoPath);
 		return videoBuffer;
 	}
 
-	tempVideoFile.close();
+	fixedVideoFile.close();
+	std::filesystem::remove(tempVideoPath);
+	std::filesystem::remove(fixedVideoPath);
+
 	return videoBuffer;
 }
