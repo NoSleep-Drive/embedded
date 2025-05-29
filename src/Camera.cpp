@@ -76,6 +76,10 @@ cv::Mat Camera::captureFrame() {
 }
 
 void Camera::setCameraStatus(bool status) {
+	bool currStatus = getCameraStatus();
+	if (currStatus == status) {
+		return;	 // 상태가 변경되지 않았으면 아무 작업도 하지 않음
+	}
 	updateDeviceStatus(0, status);	// Camera is index 0
 }
 
