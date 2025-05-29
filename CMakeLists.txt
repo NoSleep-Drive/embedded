@@ -14,7 +14,14 @@ find_package(OpenCV REQUIRED)
 # OpenCV 헤더 파일 경로를 포함 경로에 추가
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-# Python 라이브러리 찾기 (Python 해더 및 링크 라이브러리)
+# dlib 패키지 찾기
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(DLIB REQUIRED dlib-1)
+
+# dlib 헤더 파일 경로를 포함 경로에 추가
+include_directories(${DLIB_INCLUDE_DIRS})
+
+# Python 라이브러리 찾기 (Python 해더 및 링크 라이브러리) - 가속도 센서용
 find_package(PythonLibs REQUIRED)
 
 # Python 헤더 파일 경로를 포함 경로에 추가
@@ -61,20 +68,6 @@ else()
     message(FATAL_ERROR "Could not find CPR library")
 endif()
 
-# NumPy 헤더 경로를 Python으로 직접 찾기
-execute_process(
-    COMMAND python3 -c "import numpy; print(numpy.get_include())"
-    OUTPUT_VARIABLE NUMPY_INCLUDE_PATH
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-
-if(NUMPY_INCLUDE_PATH)
-    include_directories(${NUMPY_INCLUDE_PATH})
-    message(STATUS "Found NumPy include path: ${NUMPY_INCLUDE_PATH}")
-else()
-    message(FATAL_ERROR "Could not find NumPy include path")
-endif()
-
 # src 디렉토리의 모든 .cpp 파일을 자동으로 찾아 SOURCE_FILES 변수에 저장
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
 
@@ -87,9 +80,10 @@ target_compile_definitions(nosleep_drive PRIVATE
 )
 
 # 실행 파일과 외부 라이브러리를 연결
-# OpenCV, Python, CPR, OpenSSL 관련 라이브러리를 함께 링크함
+# OpenCV, dlib, Python, CPR, OpenSSL 관련 라이브러리를 함께 링크함
 target_link_libraries(nosleep_drive 
     ${OpenCV_LIBS} 
+    ${DLIB_LIBRARIES}
     ${PYTHON_LIBRARIES} 
     ${CPR_LIBRARY}
     ${OPENSSL_LIBRARIES}
@@ -101,3 +95,6 @@ target_link_libraries(nosleep_drive
 
 # 추가 컴파일 옵션
 target_compile_options(nosleep_drive PRIVATE -Wall -Wextra)
+
+# dlib 컴파일러 플래그 추가
+target_compile_options(nosleep_drive PRIVATE ${DLIB_CFLAGS_OTHER})

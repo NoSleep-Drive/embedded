@@ -79,6 +79,16 @@ FirmwareManager::FirmwareManager(const std::string& uid)
 		utils = std::make_unique<Utils>("./frames");
 		threadMonitor = std::make_unique<DBThreadMonitoring>();
 
+		// C++ 눈 감음 판별 라이브러리 초기화
+		std::cout << "C++ 눈 감음 판별 라이브러리 초기화 중..." << std::endl;
+		eyeDetectionLib = std::make_unique<EyeDetectionLib>();
+		if (!eyeDetectionLib->initialize()) {
+			std::cerr << "Warning: EyeDetectionLib 초기화 실패. 런타임에 재시도합니다." << std::endl;
+			// 초기화 실패해도 계속 진행 (런타임에 재시도)
+		} else {
+			std::cout << "EyeDetectionLib 초기화 성공" << std::endl;
+		}
+
 		std::cout << "FirmwareManager initialized with device UID: " << deviceUID << std::endl;
 		std::cout << "NoSleep Drive 펌웨어 매니저 초기화 완료" << std::endl;
 
@@ -298,66 +308,26 @@ bool FirmwareManager::processSingleFrame() {
 		return false;
 	}
 
-	// 3. 눈 감음 판단 (Python 함수 호출)
+	// 3. 눈 감음 판단 (C++ EyeDetectionLib 사용)
 	bool eyesClosed = false;
-	PyGILState_STATE gstate = PyGILState_Ensure();
 	try {
-		PyObject* pModule = PyImport_ImportModule("eye_detection_lib");
-		if (pModule != nullptr) {
-			PyObject* pFunc = PyObject_GetAttrString(pModule, "is_eye_closed");
-			if (pFunc != nullptr && PyCallable_Check(pFunc)) {
-				// cv::Mat을 NumPy 배열로 변환
-				npy_intp dims[3];
-				int nd;
-				int typenum;
-
-				if (preprocessedFrame.channels() == 1) {
-					// 그레이스케일 이미지
-					nd = 2;
-					dims[0] = preprocessedFrame.rows;
-					dims[1] = preprocessedFrame.cols;
-					typenum = NPY_UINT8;
-				} else {
-					// 컬러 이미지
-					nd = 3;
-					dims[0] = preprocessedFrame.rows;
-					dims[1] = preprocessedFrame.cols;
-					dims[2] = preprocessedFrame.channels();
-					typenum = NPY_UINT8;
-				}
-
-				PyObject* pArray = PyArray_SimpleNewFromData(nd, dims, typenum, preprocessedFrame.data);
-				if (pArray == nullptr) {
-					std::cerr << "Failed to create NumPy array" << std::endl;
-					Py_DECREF(pModule);
-					PyGILState_Release(gstate);
-					return false;
-				}
-
-				// 함수 인자 설정
-				float threshold = 0.25f;
-				PyObject* pThreshold = PyFloat_FromDouble(threshold);
-				PyObject* pArgs = PyTuple_New(2);
-				PyTuple_SetItem(pArgs, 0, pArray);
-				PyTuple_SetItem(pArgs, 1, pThreshold);
-
-				// 함수 호출
-				PyObject* pValue = PyObject_CallObject(pFunc, pArgs);
-				Py_DECREF(pArgs);
-
-				if (pValue != nullptr) {
-					eyesClosed = PyObject_IsTrue(pValue);
-					Py_DECREF(pValue);
-				}
-
-				Py_DECREF(pFunc);
+		// EyeDetectionLib 인스턴스가 없으면 생성
+		if (!eyeDetectionLib) {
+			eyeDetectionLib = std::make_unique<EyeDetectionLib>();
+			if (!eyeDetectionLib->initialize()) {
+				std::cerr << "Failed to initialize EyeDetectionLib" << std::endl;
+				return false;
 			}
-			Py_DECREF(pModule);
 		}
+
+		// 눈 감음 판단 실행
+		eyesClosed = eyeDetectionLib->isEyeClosed(frame, 0.25f);
+		std::cout << "눈 감음 상태: " << (eyesClosed ? "감김" : "열림") << std::endl;
+
 	} catch (const std::exception& e) {
 		std::cerr << "Error during eye detection: " << e.what() << std::endl;
+		eyesClosed = false;	 // 오류 시 기본값
 	}
-	PyGILState_Release(gstate);
 
 	// 4. 눈 감음 상태 저장
 	eyeClosureQueue->saveEyeClosureStatus(eyesClosed);
