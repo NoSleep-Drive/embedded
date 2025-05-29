@@ -120,9 +120,13 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 		std::string serverIP(ipC);
 
 		std::string detectedAt = getDetectedAtFromFolder();
+		std::replace(detectedAt.begin(), detectedAt.end(), 'T', ' ');
 		if (detectedAt.empty()) {
 			std::cerr << "detectedAt parsing failed" << std::endl;
 			return false;
+		}
+		if (detectedAt.find('.') == std::string::npos) {
+			detectedAt += ".000000";
 		}
 
 		std::string tempVideoPath = generateTempFilePath();
@@ -134,7 +138,8 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 
 		cpr::Multipart multipart{{"deviceUid", deviceUidEnv},
 														 {"detectedAt", detectedAt},
-														 {"videoFile", cpr::File{tempVideoPath, "video/mp4"}}};
+														{"checksum", "test"},
+														 {"videoFile", cpr::File{tempVideoPath, "video.mp4"}}};
 
 		std::string url = serverIP + "/sleep";
 		cpr::Response r = cpr::Post(cpr::Url{url}, headers, multipart);
