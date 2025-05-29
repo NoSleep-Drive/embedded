@@ -44,7 +44,7 @@ void Speaker::triggerAlert() {
 }
 
 void Speaker::triggerStart() {
-	playSound(startSountFilePath);
+	playSound(startSoundFilePath);
 }
 
 void Speaker::playSound(const std::string& soundFile) const {
@@ -55,11 +55,11 @@ void Speaker::playSound(const std::string& soundFile) const {
 
 	// 파일이 존재하는지 확인
 	if (!std::filesystem::exists(soundFile)) {
-		std::cerr << "Error: Sound sound file not found at: " << soundFile << std::endl;
+		std::cerr << "Error: Sound file not found at: " << soundFile << std::endl;
 		return;
 	}
 
-	std::cout << "Playing sound sound: " << soundFile << " at volume " << volume << "%" << std::endl;
+	std::cout << "Playing sound: " << soundFile << " at volume " << volume << "%" << std::endl;
 
 	// VLC 명령어 구성
 	// cvlc: 콘솔 모드 VLC (GUI 없음)

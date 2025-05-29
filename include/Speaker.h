@@ -8,7 +8,7 @@
 class Speaker : public Device {
 private:
 	std::string alertSoundFilePath = "../sounds/alert.mp3";
-	std::string startSountFilePath = "../sounds/start.mp3";
+	std::string startSoundFilePath = "../sounds/start.mp3";
 	int volume;
 
 	void playSound(const std::string& soundFile) const;
