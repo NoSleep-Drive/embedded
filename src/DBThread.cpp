@@ -231,22 +231,10 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 		}
 		std::cout << "임시 파일 정상 생성, 크기: " << fileSize << " bytes" << std::endl;
 
-		// 상세 요청 데이터 출력
-		std::cout << "\n=== 요청 데이터 상세 ===" << std::endl;
-		std::cout << "deviceUid: " << deviceUidEnv << std::endl;
-		std::cout << "detectedAt: " << detectedAt << std::endl;
-		std::cout << "checksum: " << checksum << std::endl;
-		std::cout << "videoFile 경로: " << tempVideoPath << std::endl;
-		std::cout << "videoFile 사이즈: " << fileSize << " bytes" << std::endl;
-		std::cout << "Authorization 헤더: Bearer " << hash << std::endl;
-		std::cout << "Content-Type: multipart/form-data (자동 설정 by cpr)" << std::endl;
-		std::cout << "요청 URL: " << serverIP + "/sleep" << std::endl;
-		std::cout << "======================" << std::endl;
-
 		cpr::Header headers = {{"Authorization", "Bearer " + hash}};
 		cpr::Multipart multipart{{"deviceUid", deviceUidEnv},
 														 {"detectedAt", detectedAt},
-														 {"videoFile", cpr::File{tempVideoPath, "video/mp4"}},
+														 {"videoFile", cpr::File{tempVideoPath, "video.mp4"}},
 														 {"checksum", checksum}};
 
 		cpr::Response r =
