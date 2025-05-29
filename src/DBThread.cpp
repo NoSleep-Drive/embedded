@@ -1,6 +1,8 @@
 #include "../include/DBThread.h"
 
 #include <cpr/cpr.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 
 #include <chrono>
 #include <ctime>
@@ -17,17 +19,58 @@
 
 namespace {
 std::string generateTempFilePath() {
+	std::filesystem::path tempDir = std::filesystem::temp_directory_path();
 	std::stringstream ss;
-	ss << std::filesystem::temp_directory_path().string();
-
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<> dis(0, 15);
+
 	ss << "temp_video_";
 	for (int i = 0; i < 8; ++i) {
 		ss << std::hex << dis(gen);
 	}
 	ss << ".mp4";
+
+	// tempDir / filename
+	std::filesystem::path tempFilePath = tempDir / ss.str();
+	return tempFilePath.string();
+}
+
+// SHA256 해시 계산 함수
+std::string calculateSHA256(const std::vector<uchar>& data) {
+	EVP_MD_CTX* mdctx = EVP_MD_CTX_new();
+	if (mdctx == nullptr) {
+		std::cerr << "EVP_MD_CTX_new 실패" << std::endl;
+		return "";
+	}
+
+	if (EVP_DigestInit_ex(mdctx, EVP_sha256(), nullptr) != 1) {
+		std::cerr << "EVP_DigestInit_ex 실패" << std::endl;
+		EVP_MD_CTX_free(mdctx);
+		return "";
+	}
+
+	if (EVP_DigestUpdate(mdctx, data.data(), data.size()) != 1) {
+		std::cerr << "EVP_DigestUpdate 실패" << std::endl;
+		EVP_MD_CTX_free(mdctx);
+		return "";
+	}
+
+	unsigned char hash[EVP_MAX_MD_SIZE];
+	unsigned int hash_len;
+	if (EVP_DigestFinal_ex(mdctx, hash, &hash_len) != 1) {
+		std::cerr << "EVP_DigestFinal_ex 실패" << std::endl;
+		EVP_MD_CTX_free(mdctx);
+		return "";
+	}
+
+	EVP_MD_CTX_free(mdctx);
+
+	// 바이트를 16진수 문자열로 변환
+	std::stringstream ss;
+	for (unsigned int i = 0; i < hash_len; i++) {
+		ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+	}
 
 	return ss.str();
 }
@@ -83,18 +126,50 @@ void DBThread::setIsDBThreadRunningFalse() {
 
 std::string DBThread::getDetectedAtFromFolder() const {
 	std::string folderName = std::filesystem::path(folderPath).filename().string();
-	std::tm folderTime = {};
-	std::istringstream ss(folderName);
-	ss >> std::get_time(&folderTime, "%Y%m%d_%H%M%S");
 
-	if (ss.fail()) {
+	// 폴더 이름 형식: "20250529_124345_300" (년월일_시분초_밀리초)
+	std::cout << "폴더 이름: " << folderName << std::endl;
+
+	// 언더스코어로 분리하여 파싱
+	std::vector<std::string> parts;
+	std::stringstream ss(folderName);
+	std::string part;
+
+	while (std::getline(ss, part, '_')) {
+		parts.push_back(part);
+	}
+
+	if (parts.size() != 3) {
+		std::cerr << "DBThread 폴더 이름 형식이 올바르지 않음: " << folderName << std::endl;
+		std::cerr << "예상 형식: 년월일_시분초_밀리초 (예: 20250529_124345_300)" << std::endl;
+		return "";
+	}
+
+	std::string dateStr = parts[0];		 // 20250529
+	std::string timeStr = parts[1];		 // 124345
+	std::string millisStr = parts[2];	 // 300
+
+	// 날짜와 시간 파싱
+	std::tm folderTime = {};
+	std::istringstream dateStream(dateStr + timeStr);
+	dateStream >> std::get_time(&folderTime, "%Y%m%d%H%M%S");
+
+	if (dateStream.fail()) {
 		std::cerr << "DBThread 폴더 이름에서 타임스탬프를 파싱할 수 없음: " << folderName << std::endl;
 		return "";
 	}
 
-	char timeStr[30];
-	std::strftime(timeStr, sizeof(timeStr), "%Y-%m-%dT%H:%M:%S", &folderTime);
-	return std::string(timeStr);
+	// 밀리초를 마이크로초로 변환 (3자리 -> 6자리)
+	std::string microseconds = millisStr + "000";	 // 300 -> 300000
+
+	// 날짜 형식 변환: "2025-05-12 12:06:13.000000"
+	char timeBuffer[30];
+	std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &folderTime);
+
+	std::string result = std::string(timeBuffer) + "." + microseconds;
+	std::cout << "변환된 날짜 형식: " << result << std::endl;
+
+	return result;
 }
 
 bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
@@ -118,30 +193,71 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 		std::string hash(hashC);
 		std::string deviceUidEnv(uidC);
 		std::string serverIP(ipC);
-
 		std::string detectedAt = getDetectedAtFromFolder();
 		if (detectedAt.empty()) {
 			std::cerr << "detectedAt 추출 실패" << std::endl;
 			return false;
 		}
 
+		std::string checksum = calculateSHA256(videoData);
+		if (checksum.empty()) {
+			std::cerr << "체크섬 계산 실패" << std::endl;
+			return false;
+		}
+
+		std::cout << "비디오 데이터 크기: " << videoData.size() << " bytes" << std::endl;
+		std::cout << "체크섬: " << checksum << std::endl;
+		std::cout << "감지 시각: " << detectedAt << std::endl;
+
 		std::string tempVideoPath = generateTempFilePath();
 		std::ofstream outFile(tempVideoPath, std::ios::binary);
+		if (!outFile) {
+			std::cerr << "임시 파일 열기 실패: " << tempVideoPath << std::endl;
+			return false;
+		}
 		outFile.write(reinterpret_cast<const char*>(videoData.data()), videoData.size());
 		outFile.close();
 
-		cpr::Header headers = {{"Authorization", "Bearer " + hash}};
+		std::ifstream checkFile(tempVideoPath, std::ios::binary | std::ios::ate);
+		if (!checkFile) {
+			std::cerr << "임시 파일 열기 실패 (검증용): " << tempVideoPath << std::endl;
+			return false;
+		}
+		std::streamsize fileSize = checkFile.tellg();
+		checkFile.close();
+		if (fileSize <= 0) {
+			std::cerr << "임시 파일 사이즈 0, 파일 손상 의심: " << tempVideoPath << std::endl;
+			return false;
+		}
+		std::cout << "임시 파일 정상 생성, 크기: " << fileSize << " bytes" << std::endl;
 
+		cpr::Header headers = {{"Authorization", "Bearer " + hash}};
 		cpr::Multipart multipart{{"deviceUid", deviceUidEnv},
 														 {"detectedAt", detectedAt},
-														 {"videoFile", cpr::File{tempVideoPath, "video/mp4"}}};
+														 {"videoFile", cpr::File{tempVideoPath, "video.mp4"}},
+														 {"checksum", checksum}};
 
-		std::string url = serverIP + "/sleep";
-		cpr::Response r = cpr::Post(cpr::Url{url}, headers, multipart);
+		cpr::Response r =
+				cpr::Post(cpr::Url{serverIP + "/sleep"}, headers, multipart, cpr::Timeout{10000});
 
-		if (r.status_code == 200 &&
+		std::cout << "응답 코드: " << r.status_code << std::endl;
+		std::cout << "응답 메시지: " << r.text << std::endl;
+		std::cout << "에러 메시지: " << r.error.message << std::endl;
+		std::cout << "에러 코드: " << static_cast<int>(r.error.code) << std::endl;
+
+		if (r.status_code == 201 &&
 				r.text.find("졸음 감지 데이터가 저장되었습니다.") != std::string::npos) {
 			backendResponse = true;
+			std::cout << "백엔드 전송 성공!" << std::endl;
+		} else if (r.status_code == 404) {
+			std::cerr << "장치를 찾을 수 없음 (404): " << r.text << std::endl;
+			break;
+		} else if (r.status_code == 401) {
+			std::cerr << "인증 실패 (401): " << r.text << std::endl;
+			break;
+		} else if (r.status_code == 400) {
+			std::cerr << "잘못된 요청 데이터 (400): " << r.text << std::endl;
+			break;
 		} else {
 			std::cerr << "백엔드 응답 실패 (" << r.status_code << "): " << r.error.message
 								<< "\n응답 본문: " << r.text << std::endl;
@@ -155,6 +271,10 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 
 		if (backendResponse) {
 			return true;
+		}
+
+		if (r.status_code >= 400 && r.status_code < 500) {
+			break;
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(RETRY_DELAY_MS));

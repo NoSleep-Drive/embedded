@@ -40,19 +40,26 @@ void Speaker::setAlert(const std::string& soundFile, int vol) {
 }
 
 void Speaker::triggerAlert() {
+	playSound(alertSoundFilePath);
+}
+
+void Speaker::triggerStart() {
+	playSound(startSoundFilePath);
+}
+
+void Speaker::playSound(const std::string& soundFile) const {
 	if (!getConnectionStatus()) {
-		std::cerr << "Cannot trigger alert: Speaker not connected" << std::endl;
+		std::cerr << "Cannot trigger sound: Speaker not connected" << std::endl;
 		return;
 	}
 
 	// 파일이 존재하는지 확인
-	if (!std::filesystem::exists(alertSoundFilePath)) {
-		std::cerr << "Error: Alert sound file not found at: " << alertSoundFilePath << std::endl;
+	if (!std::filesystem::exists(soundFile)) {
+		std::cerr << "Error: Sound file not found at: " << soundFile << std::endl;
 		return;
 	}
 
-	std::cout << "Playing alert sound: " << alertSoundFilePath << " at volume " << volume << "%"
-						<< std::endl;
+	std::cout << "Playing sound: " << soundFile << " at volume " << volume << "%" << std::endl;
 
 	// VLC 명령어 구성
 	// cvlc: 콘솔 모드 VLC (GUI 없음)
@@ -65,14 +72,14 @@ void Speaker::triggerAlert() {
 	int vlcVolume = volume * 256 / 100;	 // VLC 볼륨은 0-512 범위 (100%는 256)
 	std::string command =
 			"cvlc --play-and-exit --no-loop --gain=" + std::to_string(vlcVolume / 256.0) +
-			" --no-video \"" + alertSoundFilePath + "\" >/dev/null 2>&1 &";
+			" --no-video \"" + soundFile + "\" >/dev/null 2>&1 &";
 
 	int result = system(command.c_str());
 
 	if (result != 0) {
-		std::cerr << "Failed to play alert sound. Error code: " << result << std::endl;
+		std::cerr << "Failed to play sound. Error code: " << result << std::endl;
 	} else {
-		std::cout << "Alert triggered successfully" << std::endl;
+		std::cout << "Sound triggered successfully" << std::endl;
 	}
 }
 
