@@ -474,11 +474,6 @@ void FirmwareManager::handleSleepinessDetected(const std::string& timestamp) {
 	std::string sleepDir = utils->createSleepinessDir(timestamp);
 	std::cout << "졸음 영상 저장 경로: " << sleepDir << std::endl;
 
-	// 폴더 생성 될때까지 잠시 대기
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-	std::cout << "폴더 생성 요청 완료" << std::endl;
-
 	// 3. 진단 시점부터 앞 2.5초 프레임 가져오기
 	std::vector<cv::Mat> recentFrames = utils->loadFramesFromRecentFolder(timestamp);
 
