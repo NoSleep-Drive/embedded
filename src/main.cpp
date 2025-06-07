@@ -15,7 +15,7 @@ std::atomic<bool> running(true);
 
 // SIGINT(Ctrl+C) 및 SIGTERM 핸들러
 void signalHandler(int signum) {
-	std::cout << "인터럽트 시그널 (" << signum << ") 수신. 종료 중..." << std::endl;
+	std::cout << "interrupt signal (" << signum << ") received. terminating..." << std::endl;
 	running = false;
 }
 
@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
 	std::signal(SIGINT, signalHandler);
 	std::signal(SIGTERM, signalHandler);
 
-	std::cout << "NoSleep Drive 서비스 시작 중..." << std::endl;
+	std::cout << "NoSleep Drive service starting..." << std::endl;
 
 	// 환경 변수 설정 로드
 	Utils envLoader;
@@ -43,8 +43,8 @@ int main(int argc, char* argv[]) {
 	try {
 		// 시스템 시작
 		manager->start();
-		std::cout << "NoSleep Drive 시스템이 성공적으로 시작되었습니다." << std::endl;
-		std::cout << "장치 ID: " << deviceUID << std::endl;
+		std::cout << "NoSleep Drive system Started Successfully" << std::endl;
+		std::cout << "device ID: " << deviceUID << std::endl;
 
 		// 메인 루프
 		while (running) {
@@ -54,13 +54,13 @@ int main(int argc, char* argv[]) {
 		}
 
 		// 정상 종료 처리
-		std::cout << "시스템 종료 중..." << std::endl;
+		std::cout << "system terminating..." << std::endl;
 		manager->stop();
 	} catch (const std::exception& e) {
-		std::cerr << "오류 발생: " << e.what() << std::endl;
+		std::cerr << "error occured: " << e.what() << std::endl;
 		return 1;
 	}
 
-	std::cout << "NoSleep Drive 서비스가 정상적으로 종료되었습니다." << std::endl;
+	std::cout << "NoSleep Drive Service terminated Successfully." << std::endl;
 	return 0;
 }
