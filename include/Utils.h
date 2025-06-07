@@ -32,8 +32,10 @@ public:
 
     void loadEnvFile(const std::string& filename);
 
+    long long parseFileTimeMillis(const std::string& filename);
+
     int sleepinessEvidenceCount = 0;
-    const int MAX_SLEEPINESS_EVIDENCE_COUNT = 60;
+    const int MAX_SLEEPINESS_EVIDENCE_COUNT = 120;
     bool IsSavingSleepinessEvidence = false;
     std::string saveDirectory;
 

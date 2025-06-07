@@ -99,7 +99,7 @@ std::string DBThread::getDetectedAtFromFolder() const {
 
 bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 	const int MAX_RETRIES = 5;
-	const int RETRY_DELAY_MS = 1000;
+	const int RETRY_DELAY_MS = 10000;
 	bool backendResponse = false;
 	int attempt = 0;
 
@@ -144,7 +144,7 @@ bool DBThread::sendVideoToBackend(const std::vector<uchar>& videoData) {
 		std::string url = serverIP + "/sleep";
 		cpr::Response r = cpr::Post(cpr::Url{url}, headers, multipart);
 
-		if (r.status_code == 200 &&
+		if (r.status_code == 201 &&
 				r.text.find("sleepiness detection data saved.") != std::string::npos) {
 			backendResponse = true;
 		} else {

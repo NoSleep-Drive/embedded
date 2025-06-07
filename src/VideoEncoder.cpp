@@ -12,47 +12,29 @@ std::vector<uchar> VideoEncoder::convertFramesToMP4(const std::string& path) {
     std::vector<cv::String> framePaths;
     std::vector<uchar> videoBuffer;
 
-    std::string folderName = std::filesystem::path(path).filename().string();
-    std::tm folderTime = {};
-    std::istringstream ss(folderName);
-    ss >> std::get_time(&folderTime, "%Y%m%d_%H%M%S");
-
-    if (ss.fail()) return videoBuffer;
-
-    auto baseTime = std::chrono::system_clock::from_time_t(std::mktime(&folderTime));
-    auto startTime = baseTime - std::chrono::milliseconds(2500);
-    auto endTime = baseTime + std::chrono::milliseconds(2500);
-
-    std::string baseDir = std::filesystem::path(path).parent_path().string();
-    for (const auto& entry : std::filesystem::directory_iterator(baseDir)) {
-        if (!entry.is_directory()) continue;
-
-        std::string dirName = entry.path().filename().string();
-        std::tm dirTime = {};
-        std::istringstream dirSS(dirName);
-        dirSS >> std::get_time(&dirTime, "%Y%m%d_%H%M%S");
-
-        if (dirSS.fail()) continue;
-
-        auto dirTimePoint = std::chrono::system_clock::from_time_t(std::mktime(&dirTime));
-        if (dirTimePoint >= startTime && dirTimePoint <= endTime) {
-            for (const auto& imgEntry : std::filesystem::directory_iterator(entry)) {
-                if (imgEntry.path().extension() == ".jpg" || imgEntry.path().extension() == ".png") {
-                    framePaths.push_back(imgEntry.path().string());
-                }
-            }
+    // 현재 폴더 안의 이미지 파일만 정렬해서 수집
+    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+        if (entry.path().extension() == ".jpg" || entry.path().extension() == ".png") {
+            framePaths.push_back(entry.path().string());
         }
     }
-
-    if (framePaths.empty()) return videoBuffer;
-
+    if (framePaths.empty()) {
+        std::cerr << "선택된 폴더에 이미지가 없음" << std::endl;
+        return videoBuffer;
+    }
+    // 파일 이름을 기준으로 정렬
+    std::sort(framePaths.begin(), framePaths.end());
     const cv::Size frameSize(1280, 720);
-    auto tmp = std::filesystem::temp_directory_path() / ("video_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
+    auto tmp = std::filesystem::temp_directory_path() /
+        ("video_" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".mp4");
     std::string tempVideoPath = tmp.string();
     std::string fixedVideoPath = tempVideoPath + "_fixed.mp4";
 
     // OpenCV로 MP4 생성
-    cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate, frameSize);
+    cv::VideoWriter writer(tempVideoPath, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), frameRate,
+        frameSize);
+
     for (const auto& frame : framePaths) {
         cv::Mat img = cv::imread(frame);
         if (img.empty()) continue;

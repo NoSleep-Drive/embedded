@@ -79,7 +79,7 @@ std::vector<cv::Mat> Utils::loadFramesFromRecentFolder(const std::string& timeSt
             std::string fileName = entry.path().stem().string();	// 확장자 제외
             try {
                 long long fileTime = std::stoll(fileName);
-                if (fileTime <= timeStampNum && fileTime >= timeStampNum - 2500) {
+                if (fileTime <= timeStampNum+2500 && fileTime >= timeStampNum - 2500) {
                     selectedFiles.emplace_back(fileTime, entry.path().string());
                 }
             }
@@ -118,15 +118,19 @@ std::vector<std::pair<std::string, std::string>> Utils::getRecentFramePathsAndNa
     }
 
     std::string folderPath = saveDirectory + recentFolder;
-    long long timeStampNum = std::stoll(timeStamp);
+    long long timeStampNum = Utils::parseFileTimeMillis(timeStamp);
 
     std::vector<std::pair<long long, std::filesystem::directory_entry>> selectedFiles;
     for (const auto& entry : std::filesystem::directory_iterator(folderPath)) {
         if (entry.path().extension() == ".jpg" || entry.path().extension() == ".png") {
             std::string fileName = entry.path().stem().string();
             try {
-                long long fileTime = std::stoll(fileName);
-                if (fileTime <= timeStampNum && fileTime >= timeStampNum - 2500) {
+                std::string fileName = entry.path().stem().string(); // "20250608_001047_555"
+                long long fileTime = parseFileTimeMillis(fileName);
+
+                if (fileTime == -1) continue;
+
+                if (fileTime <= timeStampNum + 2500 && fileTime >= timeStampNum - 2500) {
                     selectedFiles.emplace_back(fileTime, entry);
                 }
             }
@@ -147,6 +151,30 @@ std::vector<std::pair<std::string, std::string>> Utils::getRecentFramePathsAndNa
     }
 
     return files;
+}
+
+long long Utils::parseFileTimeMillis(const std::string& filename) {
+    if (filename.size() < 18) return -1;  
+
+    int year = std::stoi(filename.substr(0, 4));
+    int month = std::stoi(filename.substr(4, 2));
+    int day = std::stoi(filename.substr(6, 2));
+    int hour = std::stoi(filename.substr(9, 2));
+    int min = std::stoi(filename.substr(11, 2));
+    int sec = std::stoi(filename.substr(13, 2));
+    int millis = std::stoi(filename.substr(16, 3)); // ← 여기도 수정
+
+    std::tm t = {};
+    t.tm_year = year - 1900;
+    t.tm_mon = month - 1;
+    t.tm_mday = day;
+    t.tm_hour = hour;
+    t.tm_min = min;
+    t.tm_sec = sec;
+
+    auto tp = std::chrono::system_clock::from_time_t(std::mktime(&t));
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        tp.time_since_epoch()).count() + millis;
 }
 
 std::string Utils::createSleepinessDir(const std::string& timeStamp){

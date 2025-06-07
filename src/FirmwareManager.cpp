@@ -436,14 +436,16 @@ bool FirmwareManager::requestDiagnosis() {
 	}
 	else {
 		previousSleepy = false;
-
-		// 스택에 저장된 졸음 근거 영상 폴더를 전부 DB 전송 스레드에 추가
-		while (!sleepImgPathStack.empty()) {
+		if (!sleepImgPathStack.empty()) {
 			std::string sleepDir = utils->saveDirectory + sleepImgPathStack.top();
 			sleepImgPathStack.pop();
-
 			auto dbThread = std::make_shared<DBThread>(deviceUID, sleepDir, threadMonitor.get());
 			threadMonitor->addDBThread(dbThread);
+		}
+
+		// 스택에 저장된 필요 없는 졸음 근거 영상 경로 제거
+		while (!sleepImgPathStack.empty()) {
+			sleepImgPathStack.pop();
 		}
 		threadMonitor->setIsDBThreadRunning(true);
 		diagnosticCycle++;

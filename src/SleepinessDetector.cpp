@@ -71,7 +71,7 @@ void SleepinessDetector::sendDriverFrame(const cv::Mat& frame) {
 			{"deviceUid", deviceUidEnv}, {"frameIdx", frameIndex++}, {"driverFrame", base64Image}};
 
 	// 요청 URL 생성
-	std::string url = serverIP + "/api/save/frame";
+	std::string url = serverIP + "/save/frame";
 
 	// API 요청
 	std::thread([](std::string url, std::string data) {
