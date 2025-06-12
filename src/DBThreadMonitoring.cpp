@@ -7,7 +7,7 @@ std::string DBThreadMonitoring::generateThreadKey(const std::string& deviceUid, 
 }
 
 DBThreadMonitoring::DBThreadMonitoring() {
-    startDBMonitoring();
+    //startDBMonitoring();
 }
 
 DBThreadMonitoring::~DBThreadMonitoring() {
@@ -19,9 +19,14 @@ DBThreadMonitoring::~DBThreadMonitoring() {
 }
 
 void DBThreadMonitoring::startDBMonitoring() {
-    monitoringThread = std::thread([this] {
-        processThreadQueue();
-    });
+    try {
+        monitoringThread = std::thread([this] {
+            processThreadQueue();
+            });
+    }
+    catch (const std::exception& e) {
+        std::cout << "Error during starting thread: " << e.what() << std::endl;
+    }
 }
 
 void DBThreadMonitoring::processThreadQueue() {
@@ -42,7 +47,7 @@ void DBThreadMonitoring::processThreadQueue() {
                     ptr->sendDataToDB();
                 }
                 catch (const std::exception& e) {
-                    std::cerr << "DBThread 예외: " << e.what() << std::endl;
+                    std::cerr << "DBThread exception: " << e.what() << std::endl;
                 }
                 removeActiveThread(generateThreadKey(ptr->getDeviceUid(), ptr->getFolderPath()));
                 }).detach();
@@ -59,10 +64,10 @@ void DBThreadMonitoring::addDBThread(std::shared_ptr<DBThread> thread) {
         activeThreadKeys.insert(threadKey);
         threadQueue.push(thread);
         condition.notify_one();
-        std::cout << "DBThread 추가됨, 큐 크기: " << threadQueue.size() << std::endl;
+        std::cout << "DBThread added, queue size: " << threadQueue.size() << std::endl;
     }
     else {
-        std::cout << "이미 실행 중인 스레드입니다 : " << threadKey << std::endl;
+        std::cout << "thread is already started : " << threadKey << std::endl;
     }
 }
 

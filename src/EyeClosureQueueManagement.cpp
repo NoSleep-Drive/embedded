@@ -28,35 +28,27 @@ void EyeClosureQueueManagement::saveEyeClosureStatus(bool eyeClosed) {
 }
 
 bool EyeClosureQueueManagement::detectSleepiness() {
-	// 덱의 데이터가 CONSECUTIVE_FRAMES_FOR_SLEEPINESS보다 적으면 졸음이 아님
 	if (eyeClosureDeque.size() < CONSECUTIVE_FRAMES_FOR_SLEEPINESS) {
-		std::cout << "Deque size (" << eyeClosureDeque.size()
-							<< ") is less than required consecutive frames (" << CONSECUTIVE_FRAMES_FOR_SLEEPINESS
-							<< ") for sleepiness detection." << std::endl;
 		return false;
 	}
 
-	// 가장 최근 프레임부터 역순으로 연속된 눈 감음 검사
-	int consecutiveClosedCount = 0;
+	int consecutiveClosedFrames = 0;
+	int maxConsecutiveClosedFrames = 0;
 
-	// 덱을 반복하면서 연속된 눈 감음 상태 검사
-	for (int i = eyeClosureDeque.size() - 1; i >= 0; i--) {
-		if (eyeClosureDeque[i]) {
-			consecutiveClosedCount++;
-
-			// 연속된 눈 감음 프레임이 기준치에 도달하면 졸음으로 판단
-			if (consecutiveClosedCount >= CONSECUTIVE_FRAMES_FOR_SLEEPINESS) {
-				std::cout << "Detected sleepiness: " << consecutiveClosedCount
-									<< " consecutive closed-eye frames." << std::endl;
-				return true;
-			}
-		} else {
-			// 눈 감음이 연속되지 않으면 카운트 리셋
-			consecutiveClosedCount = 0;
+	// deque의 뒤에서부터 앞으로 순회하면서 현재 연속된 감김 프레임 수를 계산
+	for (auto it = eyeClosureDeque.rbegin(); it != eyeClosureDeque.rend(); ++it) {
+		if (*it) {	// 눈이 감긴 상태
+			consecutiveClosedFrames++;
+			maxConsecutiveClosedFrames = std::max(maxConsecutiveClosedFrames, consecutiveClosedFrames);
+		}
+		else {	// 눈이 열린 상태
+			break;	// 연속성이 깨졌으므로 중단
 		}
 	}
 
-	std::cout << "No sleepiness detected. Maximum consecutive closed-eye frames: "
-						<< consecutiveClosedCount << std::endl;
-	return false;
+	std::cout << "Current consecutive closed frames from end: " << consecutiveClosedFrames
+		<< std::endl;
+
+	// 현재 시점에서 연속으로 감긴 프레임이 임계값 이상인지 확인
+	return consecutiveClosedFrames >= CONSECUTIVE_FRAMES_FOR_SLEEPINESS;
 }

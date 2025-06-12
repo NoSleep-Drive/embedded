@@ -11,7 +11,7 @@ private:
 	int volume;
 
 public:
-	Speaker(const std::string& soundFilePath = "./sounds/alert.mp3", int vol = 70);
+	Speaker(const std::string& soundFilePath = "../../../sounds/alert.mp3", int vol = 70);
 	~Speaker();
 
 	void initialize() override;

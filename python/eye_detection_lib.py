@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import os
 import numpy as np
 import dlib
 import cv2
@@ -27,7 +28,9 @@ def initialize():
     global predictor
     try:
         # Load face landmark model
-        predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(base_path, "eye_closed_detection", "shape_predictor_68_face_landmarks.dat")
+        predictor = dlib.shape_predictor(model_path)
         return True
     except Exception as e:
         print(f"[ERROR] Error during initialization: {e}")

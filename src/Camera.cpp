@@ -15,11 +15,30 @@ Camera::~Camera() {
 }
 
 void Camera::initialize() {
+#ifdef _WIN32
+	// ✅ Windows: 기본 웹캠 사용 (cv::VideoCapture 인덱스 0)
+	int cameraIndex = 0;
+	cap.open(cameraIndex, cv::CAP_DSHOW); // 또는 CAP_ANY, CAP_MSMF도 가능
+
+	if (!cap.isOpened()) {
+		std::cerr << "Error: Could not open default webcam on Windows." << std::endl;
+		setConnectionStatus(false);
+		updateDeviceStatus(0, false);
+		return;
+	}
+
+	// 해상도 설정
+	cap.set(cv::CAP_PROP_FRAME_WIDTH, resolution[0]);
+	cap.set(cv::CAP_PROP_FRAME_HEIGHT, resolution[1]);
+
+#else
+	// ✅ Linux / Raspberry Pi: GStreamer 파이프라인 사용
+
 	// GStreamer 파이프라인 구성
 	gstreamerPipeline = "libcamerasrc camera-name=" + cameraName +
-											" ! video/x-raw,width=" + std::to_string(resolution[0]) +
-											",height=" + std::to_string(resolution[1]) + ",framerate=10/1,format=RGBx" +
-											" ! videoconvert ! videoscale" + " ! video/x-raw,format=BGR" + " ! appsink";
+		" ! video/x-raw,width=" + std::to_string(resolution[0]) +
+		",height=" + std::to_string(resolution[1]) + ",framerate=10/1,format=RGBx" +
+		" ! videoconvert ! videoscale" + " ! video/x-raw,format=BGR" + " ! appsink";
 
 	// GStreamer 파이프라인으로 카메라 열기
 	cap.open(gstreamerPipeline, cv::CAP_GSTREAMER);
@@ -30,7 +49,9 @@ void Camera::initialize() {
 		setConnectionStatus(false);
 		updateDeviceStatus(0, false);	 // Camera is index 0
 		return;
-	}
+}
+#endif
+
 
 	// 테스트 프레임 캡처
 	cv::Mat testFrame;
@@ -74,6 +95,10 @@ cv::Mat Camera::captureFrame() {
 }
 
 void Camera::setCameraStatus(bool status) {
+	bool currStatus = getCameraStatus();
+	if (currStatus == status) {
+		return;	 // 상태가 변경되지 않았으면 아무 작업도 하지 않음
+	}
 	updateDeviceStatus(0, status);	// Camera is index 0
 }
 
