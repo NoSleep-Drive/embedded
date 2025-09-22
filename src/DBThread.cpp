@@ -96,6 +96,9 @@ bool DBThread::sendDataToDB() {
 	VideoEncoder encoder;
 	std::cout << "백서버 통신 전 이미지 데이터들을 영상 데이터로 변환" << std::endl;
 
+	// 폴더에 이미지 프레임 충분히 수집될 때까지 sleep
+	std::this_thread::sleep_for(std::chrono::seconds(3));
+
 	std::vector<uchar> videoData = encoder.convertFramesToMP4(folderPath);
 	if (videoData.empty()) {
 		std::cerr << "영상 생성 실패로 영상 전송 통신 취소." << std::endl;
